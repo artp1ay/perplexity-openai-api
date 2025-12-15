@@ -21,7 +21,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -388,27 +388,74 @@ class ConversationManager:
 # Pydantic Models
 # =============================================================================
 
+class ContentPart(BaseModel):
+    """A content part for multi-modal messages."""
+    type: str
+    text: str | None = None
+    image_url: dict[str, str] | None = None
+    
+    model_config = ConfigDict(extra="allow")
+
+
 class ChatMessage(BaseModel):
     role: str
-    content: str
+    content: str | list[dict[str, Any]]
     name: str | None = None
+    
+    model_config = ConfigDict(extra="allow")
+    
+    def get_text_content(self) -> str:
+        """Extract text content, handling both string and array formats."""
+        if isinstance(self.content, str):
+            return self.content
+        
+        # Handle array format - extract text from content parts
+        text_parts = []
+        for part in self.content:
+            if isinstance(part, dict):
+                if part.get("type") == "text" and "text" in part:
+                    text_parts.append(part["text"])
+        
+        return "\n".join(text_parts) if text_parts else ""
 
 
 class ChatRequest(BaseModel):
     model: str = "perplexity-auto"
     messages: list[ChatMessage]
     stream: bool = False
+    
+    # Standard OpenAI parameters (not all may be supported by Perplexity)
     temperature: float | None = None
+    top_p: float | None = None
+    n: int | None = 1
     max_tokens: int | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    logit_bias: dict[str, float] | None = None
     user: str | None = None
+    stop: str | list[str] | None = None
+    
+    # Additional OpenAI parameters
+    seed: int | None = None
+    logprobs: bool | None = None
+    top_logprobs: int | None = None
+    response_format: dict[str, Any] | None = None
+    tools: list[dict[str, Any]] | None = None
+    tool_choice: str | dict[str, Any] | None = None
+    parallel_tool_calls: bool | None = None
+    
+    # Perplexity-specific parameters
     conversation_id: str | None = None
     citation_mode: str | None = None
+    
+    model_config = ConfigDict(extra="allow")  # Allow additional fields
 
 
 class ChatChoice(BaseModel):
     index: int
     message: ChatMessage
     finish_reason: str = "stop"
+    logprobs: dict[str, Any] | None = None
 
 
 class Usage(BaseModel):
@@ -424,12 +471,15 @@ class ChatResponse(BaseModel):
     model: str
     choices: list[ChatChoice]
     usage: Usage
+    system_fingerprint: str | None = None
+    service_tier: str | None = None
 
 
 class ChunkChoice(BaseModel):
     index: int
     delta: dict[str, Any]
     finish_reason: str | None = None
+    logprobs: dict[str, Any] | None = None
 
 
 class ChatChunk(BaseModel):
@@ -438,6 +488,8 @@ class ChatChunk(BaseModel):
     created: int
     model: str
     choices: list[ChunkChoice]
+    system_fingerprint: str | None = None
+    service_tier: str | None = None
 
 
 class ModelItem(BaseModel):
@@ -450,6 +502,19 @@ class ModelItem(BaseModel):
 class ModelsResponse(BaseModel):
     object: str = "list"
     data: list[ModelItem]
+
+
+class ErrorDetail(BaseModel):
+    """OpenAI-compatible error detail."""
+    message: str
+    type: str
+    param: str | None = None
+    code: str | None = None
+
+
+class ErrorResponse(BaseModel):
+    """OpenAI-compatible error response."""
+    error: ErrorDetail
 
 
 # =============================================================================
@@ -577,16 +642,22 @@ def messages_to_query(messages: list[ChatMessage]) -> str:
     sys_msgs = [m for m in messages if m.role == "system"]
     
     if len(user_msgs) == 1 and not sys_msgs:
-        return user_msgs[0].content
+        return user_msgs[0].get_text_content()
     
     parts = []
     for msg in messages:
         if msg.role == "system":
-            parts.append(f"[System]\n{msg.content}")
+            parts.append(f"[System]\n{msg.get_text_content()}")
         elif msg.role == "user":
-            parts.append(f"User: {msg.content}")
+            parts.append(f"User: {msg.get_text_content()}")
         elif msg.role == "assistant":
-            parts.append(f"Assistant: {msg.content}")
+            parts.append(f"Assistant: {msg.get_text_content()}")
+        elif msg.role == "tool":
+            # Tool responses are included as context
+            parts.append(f"[Tool Result]\n{msg.get_text_content()}")
+        elif msg.role == "function":
+            # Function responses (deprecated but still supported)
+            parts.append(f"[Function Result]\n{msg.get_text_content()}")
     return "\n\n".join(parts)
 
 
@@ -660,6 +731,139 @@ async def get_model(model_id: str, request: Request):
     raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found")
 
 
+@app.post("/v1/embeddings")
+async def embeddings(request: Request):
+    """Embeddings endpoint (not supported)."""
+    get_user(request)
+    raise HTTPException(
+        status_code=501,
+        detail={
+            "error": {
+                "message": "Embeddings are not supported by this API. This endpoint wraps Perplexity AI which does not provide embedding models.",
+                "type": "not_implemented_error",
+                "code": "unsupported_endpoint"
+            }
+        }
+    )
+
+
+class CompletionRequest(BaseModel):
+    """Legacy completions request."""
+    model: str = "perplexity-auto"
+    prompt: str | list[str]
+    max_tokens: int | None = 16
+    temperature: float | None = None
+    top_p: float | None = None
+    n: int | None = 1
+    stream: bool = False
+    stop: str | list[str] | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    user: str | None = None
+    suffix: str | None = None
+    echo: bool = False
+    best_of: int | None = None
+    logprobs: int | None = None
+    
+    model_config = ConfigDict(extra="allow")
+
+
+class CompletionChoice(BaseModel):
+    """Legacy completion choice."""
+    text: str
+    index: int
+    logprobs: dict[str, Any] | None = None
+    finish_reason: str = "stop"
+
+
+class CompletionResponse(BaseModel):
+    """Legacy completion response."""
+    id: str
+    object: str = "text_completion"
+    created: int
+    model: str
+    choices: list[CompletionChoice]
+    usage: Usage
+    system_fingerprint: str | None = None
+
+
+@app.post("/v1/completions")
+async def completions(request: Request, body: CompletionRequest):
+    """Legacy completions endpoint for inline/code completions."""
+    global request_count
+    request_count += 1
+    
+    user_id = get_user(request)
+    
+    # Handle prompt as string or list
+    prompt = body.prompt if isinstance(body.prompt, str) else "\n".join(body.prompt)
+    
+    if not prompt:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": {
+                    "message": "prompt is required",
+                    "type": "invalid_request_error",
+                    "param": "prompt",
+                    "code": "missing_required_parameter"
+                }
+            }
+        )
+    
+    # Validate n parameter
+    if body.n and body.n > 1:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": {
+                    "message": "n > 1 is not supported. Only single completions are available.",
+                    "type": "invalid_request_error",
+                    "param": "n",
+                    "code": "unsupported_parameter"
+                }
+            }
+        )
+    
+    model_obj = models.get(body.model)
+    citation_mode = CitationMode.CLEAN  # No citations for code completions
+    
+    conv_id, session = manager.get_or_create(
+        None, user_id, body.model, citation_mode
+    )
+    
+    response_id = f"cmpl-{uuid.uuid4().hex[:24]}"
+    created = int(time.time())
+    
+    try:
+        # Run completion
+        await asyncio.to_thread(session.conversation.ask, prompt, model=model_obj, stream=False)
+        answer = session.conversation.answer or ""
+        
+        # Add suffix if provided
+        if body.suffix:
+            answer = answer + body.suffix
+        
+        return CompletionResponse(
+            id=response_id,
+            created=created,
+            model=body.model,
+            choices=[CompletionChoice(index=0, text=answer)],
+            usage=Usage(
+                prompt_tokens=estimate_tokens(prompt),
+                completion_tokens=estimate_tokens(answer),
+                total_tokens=estimate_tokens(prompt) + estimate_tokens(answer),
+            ),
+            system_fingerprint="perplexity_v1",
+        )
+    except PerplexityError as e:
+        logging.error(f"Perplexity error: {e}")
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/v1/models/refresh")
 async def refresh_models(request: Request):
     """Force refresh models."""
@@ -684,6 +888,18 @@ async def delete_conversation(conversation_id: str, request: Request):
     raise HTTPException(status_code=404, detail="Conversation not found")
 
 
+@app.get("/v1/chat/completions")
+async def chat_completions_info(request: Request):
+    """Info about chat completions endpoint."""
+    return {
+        "object": "endpoint",
+        "endpoint": "/v1/chat/completions",
+        "methods": ["POST"],
+        "description": "Create a chat completion. POST JSON with 'model' and 'messages' fields.",
+        "documentation": "https://platform.openai.com/docs/api-reference/chat/create"
+    }
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request, body: ChatRequest):
     """Chat completions endpoint."""
@@ -693,7 +909,31 @@ async def chat_completions(request: Request, body: ChatRequest):
     user_id = get_user(request)
     
     if not body.messages:
-        raise HTTPException(status_code=400, detail="Messages required")
+        raise HTTPException(
+            status_code=400, 
+            detail={
+                "error": {
+                    "message": "messages is required",
+                    "type": "invalid_request_error",
+                    "param": "messages",
+                    "code": "missing_required_parameter"
+                }
+            }
+        )
+    
+    # Validate n parameter (number of completions)
+    if body.n and body.n > 1:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": {
+                    "message": "n > 1 is not supported. Only single completions are available.",
+                    "type": "invalid_request_error",
+                    "param": "n",
+                    "code": "unsupported_parameter"
+                }
+            }
+        )
     
     model_obj = models.get(body.model)
     citation_mode = parse_citation_mode(body.citation_mode)
@@ -728,6 +968,7 @@ async def chat_completions(request: Request, body: ChatRequest):
                     completion_tokens=estimate_tokens(answer),
                     total_tokens=estimate_tokens(query) + estimate_tokens(answer),
                 ),
+                system_fingerprint="perplexity_v1",
             )
     except PerplexityError as e:
         logging.error(f"Perplexity error: {e}")
@@ -747,7 +988,7 @@ async def stream_response(
 ) -> AsyncGenerator[str, None]:
     """Stream chat response."""
     # Initial chunk
-    yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={'role': 'assistant', 'content': ''})]).model_dump_json()}\n\n"
+    yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={'role': 'assistant', 'content': ''})], system_fingerprint='perplexity_v1').model_dump_json()}\n\n"
 
     # The underlying streaming generator is synchronous and can block the event loop.
     # Move it to a background thread and ship deltas back through an asyncio queue.
@@ -781,16 +1022,16 @@ async def stream_response(
     while True:
         kind, payload = await queue.get()
         if kind == "delta":
-            yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={'content': payload})]).model_dump_json()}\n\n"
+            yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={'content': payload})], system_fingerprint='perplexity_v1').model_dump_json()}\n\n"
         elif kind == "error":
             logging.error(f"Streaming error: {payload}")
-            yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={}, finish_reason='error')]).model_dump_json()}\n\n"
+            yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={}, finish_reason='error')], system_fingerprint='perplexity_v1').model_dump_json()}\n\n"
             break
         else:
             break
     
     # Final chunk
-    yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={}, finish_reason='stop')]).model_dump_json()}\n\n"
+    yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={}, finish_reason='stop')], system_fingerprint='perplexity_v1').model_dump_json()}\n\n"
     yield "data: [DONE]\n\n"
 
 
@@ -903,6 +1144,7 @@ async def ws_chat(ws: WebSocket):
                         completion_tokens=estimate_tokens(answer),
                         total_tokens=estimate_tokens(query) + estimate_tokens(answer),
                     ),
+                    system_fingerprint="perplexity_v1",
                 )
                 await ws.send_text(resp.model_dump_json())
 
