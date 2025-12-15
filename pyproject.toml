@@ -23,9 +23,14 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "black>=25.12.0",
     "curl-cffi>=0.13.0",
+    "fastapi>=0.124.4",
     "orjson>=3.11.5",
     "pydantic>=2.12.5",
+    "python-dotenv>=1.2.1",
+    "slowapi>=0.1.9",
+    "uvicorn>=0.38.0",
 ]
 
 [dependency-groups]

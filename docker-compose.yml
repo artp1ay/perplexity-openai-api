@@ -1,0 +1,26 @@
+services:
+  perplexity-api:
+    build: .
+    container_name: perplexity-openai-api
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - PERPLEXITY_SESSION_TOKEN=${PERPLEXITY_SESSION_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - HOST=0.0.0.0
+      - PORT=8000
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENABLE_RATE_LIMITING=${ENABLE_RATE_LIMITING:-true}
+      - REQUESTS_PER_MINUTE=${REQUESTS_PER_MINUTE:-60}
+      - CONVERSATION_TIMEOUT=${CONVERSATION_TIMEOUT:-3600}
+      - MAX_CONVERSATIONS_PER_USER=${MAX_CONVERSATIONS_PER_USER:-100}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-perplexity-auto}
+      - DEFAULT_CITATION_MODE=${DEFAULT_CITATION_MODE:-CLEAN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

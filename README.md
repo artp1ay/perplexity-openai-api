@@ -1,134 +1,120 @@
-<div align="center">
+# Perplexity OpenAI-Compatible API Server
 
-# Perplexity WebUI Scraper
+Transform Perplexity AI into a drop-in replacement for OpenAI's API. This server bridges the gap between Perplexity's powerful search-augmented intelligence and applications built for OpenAI's standard interface. Deploy in seconds with Docker, no code changes required. 
+It is forked from [henrique-coder/perplexity-webui-scraper](https://github.com/henrique-coder/perplexity-webui-scraper) and uses Python and FastAPI to create a RESTful API server.
 
-Python scraper to extract AI responses from [Perplexity's](https://www.perplexity.ai) web interface.
 
-[![PyPI](https://img.shields.io/pypi/v/perplexity-webui-scraper?color=blue)](https://pypi.org/project/perplexity-webui-scraper)
-[![Python](https://img.shields.io/pypi/pyversions/perplexity-webui-scraper)](https://pypi.org/project/perplexity-webui-scraper)
-[![License](https://img.shields.io/github/license/henrique-coder/perplexity-webui-scraper?color=green)](./LICENSE)
+### Features
 
-</div>
-
----
-
-## Installation
-
-```bash
-uv pip install perplexity-webui-scraper
-```
-
-## Requirements
-
-- **Perplexity Pro subscription**
-- **Session token** (`__Secure-next-auth.session-token` cookie from browser)
-
-### Getting Your Session Token
-
-1. Log in at [perplexity.ai](https://www.perplexity.ai)
-2. Open DevTools (`F12`) → Application → Cookies
-3. Copy `__Secure-next-auth.session-token` value
-4. Store in `.env`: `PERPLEXITY_SESSION_TOKEN=your_token`
+- Models are automatically discovered from Perplexity.
+- One-click deployment with Docker
+- Request rate limiting 
 
 ## Quick Start
 
-```python
-from perplexity_webui_scraper import Perplexity
+### Docker (Recommended)
 
-client = Perplexity(session_token="YOUR_TOKEN")
-conversation = client.create_conversation()
+```bash
+# 1. Copy environment template
+cp .env.example .env
 
-conversation.ask("What is quantum computing?")
-print(conversation.answer)
+# 2. Add your Perplexity session token to .env
 
-# Follow-up
-conversation.ask("Explain it simpler")
-print(conversation.answer)
+# 3. Start the server
+docker-compose up -d
+
+# 4. Test
+curl http://localhost:8000/health
+curl http://localhost:8000/v1/models
 ```
 
-### Streaming
+### Manual
 
-```python
-for chunk in conversation.ask("Explain AI", stream=True):
-    print(chunk.answer)
+```bash
+# Install dependencies
+pip install -r requirements.txt
+pip install -e .
+
+# Copy and configure .env
+cp .env.example .env
+# Edit .env with your session token
+
+# Run
+python openai_server.py
 ```
 
-### With Options
+## Getting Your Session Token
+
+1. Log in at [perplexity.ai](https://www.perplexity.ai)
+2. Open DevTools (F12) → Application → Cookies
+3. Copy `__Secure-next-auth.session-token` value
+4. Add to `.env`: `PERPLEXITY_SESSION_TOKEN=your_token`
+
+## API Usage
+
+The server is 100% OpenAI API compatible:
 
 ```python
-from perplexity_webui_scraper import (
-    ConversationConfig,
-    Coordinates,
-    Models,
-    SourceFocus,
+import openai
+
+client = openai.OpenAI(
+    api_key="your-api-key",  # Optional
+    base_url="http://localhost:8000/v1"
 )
 
-config = ConversationConfig(
-    model=Models.RESEARCH,
-    source_focus=[SourceFocus.WEB, SourceFocus.ACADEMIC],
-    language="en-US",
-    coordinates=Coordinates(latitude=40.7128, longitude=-74.0060),
+response = client.chat.completions.create(
+    model="perplexity-auto",
+    messages=[{"role": "user", "content": "Hello!"}]
 )
 
-conversation = client.create_conversation(config)
-conversation.ask("Latest AI research", files=["paper.pdf"])
+print(response.choices[0].message.content)
 ```
 
-## API
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "perplexity-auto", "messages": [{"role": "user", "content": "Hello!"}]}'
+```
 
-### `Perplexity(session_token, config?)`
+## Endpoints
 
-| Parameter       | Type           | Description        |
-| --------------- | -------------- | ------------------ |
-| `session_token` | `str`          | Browser cookie     |
-| `config`        | `ClientConfig` | Timeout, TLS, etc. |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/chat/completions` | POST | Chat completions |
+| `/v1/models` | GET | List available models |
+| `/v1/models/refresh` | POST | Refresh models from Perplexity |
+| `/conversations` | GET | List conversations |
+| `/stats` | GET | Server statistics |
+| `/health` | GET | Health check |
 
-### `Conversation.ask(query, model?, files?, citation_mode?, stream?)`
+## Configuration
 
-| Parameter       | Type           | Default       | Description         |
-| --------------- | -------------- | ------------- | ------------------- |
-| `query`         | `str`          | —             | Question (required) |
-| `model`         | `Model`        | `Models.BEST` | AI model            |
-| `files`         | `list[str]`    | `None`        | File paths          |
-| `citation_mode` | `CitationMode` | `CLEAN`       | Citation format     |
-| `stream`        | `bool`         | `False`       | Enable streaming    |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PERPLEXITY_SESSION_TOKEN` | - | Required: Session token |
+| `OPENAI_API_KEY` | - | Optional: API key for auth |
+| `PORT` | 8000 | Server port |
+| `LOG_LEVEL` | INFO | Logging level |
+| `ENABLE_RATE_LIMITING` | true | Enable rate limiting |
+| `REQUESTS_PER_MINUTE` | 60 | Rate limit |
+| `CONVERSATION_TIMEOUT` | 3600 | Session timeout (seconds) |
+| `DEFAULT_MODEL` | perplexity-auto | Default model |
 
-### Models
+## Models
 
-| Model                          | Description       |
-| ------------------------------ | ----------------- |
-| `Models.BEST`                  | Auto-select best  |
-| `Models.RESEARCH`              | Deep research     |
-| `Models.SONAR`                 | Fast queries      |
-| `Models.GPT_51`                | OpenAI GPT-5.1    |
-| `Models.CLAUDE_45_SONNET`      | Claude 4.5 Sonnet |
-| `Models.GEMINI_3_PRO_THINKING` | Gemini 3.0 Pro    |
-| `Models.GROK_41`               | xAI Grok 4.1      |
+Models are automatically fetched from Perplexity. Common models include:
 
-### CitationMode
+- `perplexity-auto` - Auto-select best model
+- `perplexity-sonar` - Fast responses
+- `perplexity-research` - Deep research
+- GPT, Claude, Gemini, Grok models via Perplexity
 
-| Mode       | Output                |
-| ---------- | --------------------- |
-| `DEFAULT`  | `text[1]`             |
-| `MARKDOWN` | `text[1](url)`        |
-| `CLEAN`    | `text` (no citations) |
+Use `/v1/models` to see all available models.
 
-### ConversationConfig
+## License
 
-| Parameter         | Default       | Description        |
-| ----------------- | ------------- | ------------------ |
-| `model`           | `Models.BEST` | Default model      |
-| `citation_mode`   | `CLEAN`       | Citation format    |
-| `save_to_library` | `False`       | Save to library    |
-| `search_focus`    | `WEB`         | Search type        |
-| `source_focus`    | `WEB`         | Source types       |
-| `time_range`      | `ALL`         | Time filter        |
-| `language`        | `"en-US"`     | Response language  |
-| `timezone`        | `None`        | Timezone           |
-| `coordinates`     | `None`        | Location (lat/lng) |
+MIT
 
 ## Disclaimer
 
-This is an **unofficial** library. It uses internal APIs that may change without notice. Use at your own risk. Not for production use.
-
-By using this library, you agree to Perplexity AI's Terms of Service.
+This is an unofficial implementation using internal Perplexity APIs. Use at your own risk.
