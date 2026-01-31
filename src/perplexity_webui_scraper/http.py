@@ -1,6 +1,4 @@
-"""
-HTTP client wrapper.
-"""
+"""HTTP client wrapper."""
 
 from __future__ import annotations
 

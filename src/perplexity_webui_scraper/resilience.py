@@ -1,13 +1,11 @@
-"""
-Resilience utilities for HTTP requests.
-"""
+"""Resilience utilities for HTTP requests."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import random
+from random import choice
 from threading import Lock
-import time
+from time import monotonic, sleep
 from typing import TYPE_CHECKING, TypeVar
 
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
@@ -61,7 +59,7 @@ class RateLimiter:
         """Wait until a request can be made within rate limits."""
 
         with self._lock:
-            now = time.monotonic()
+            now = monotonic()
             min_interval = 1.0 / self.requests_per_second
 
             if self._last_request > 0:
@@ -69,15 +67,15 @@ class RateLimiter:
                 wait_time = min_interval - elapsed
 
                 if wait_time > 0:
-                    time.sleep(wait_time)
+                    sleep(wait_time)
 
-            self._last_request = time.monotonic()
+            self._last_request = monotonic()
 
 
 def get_random_browser_profile() -> str:
     """Get a random browser profile for fingerprint rotation."""
 
-    return random.choice(BROWSER_PROFILES)
+    return choice(BROWSER_PROFILES)
 
 
 def create_retry_decorator(

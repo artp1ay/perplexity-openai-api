@@ -1,8 +1,4 @@
-"""
-MCP (Model Context Protocol) server for Perplexity WebUI Scraper.
-
-This module provides an MCP server that exposes Perplexity AI search capabilities to AI assistants.
-"""
+"""MCP server for Perplexity WebUI Scraper."""
 
 from __future__ import annotations
 

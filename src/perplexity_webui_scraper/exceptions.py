@@ -1,6 +1,4 @@
-"""
-Custom exceptions.
-"""
+"""Custom exceptions."""
 
 from __future__ import annotations
 
@@ -27,14 +25,7 @@ class PerplexityError(Exception):
 
 
 class HTTPError(PerplexityError):
-    """
-    Raised when an HTTP request fails.
-
-    Attributes:
-        status_code: HTTP status code (if available).
-        url: Request URL (if available).
-        response_body: Truncated response body (max 500 chars).
-    """
+    """Raised when an HTTP request fails."""
 
     def __init__(
         self,
@@ -89,12 +80,7 @@ class FileValidationError(PerplexityError):
 
 
 class ResearchClarifyingQuestionsError(PerplexityError):
-    """
-    Raised when Research mode requires clarifying questions.
-
-    Attributes:
-        questions: List of clarifying questions from the API.
-    """
+    """Raised when Research mode requires clarifying questions."""
 
     def __init__(self, questions: list[str]) -> None:
         self.questions = questions
@@ -105,12 +91,7 @@ class ResearchClarifyingQuestionsError(PerplexityError):
 
 
 class ResponseParsingError(PerplexityError):
-    """
-    Raised when the API response cannot be parsed.
-
-    Attributes:
-        raw_data: The raw data that failed to parse.
-    """
+    """Raised when the API response cannot be parsed."""
 
     def __init__(self, message: str, raw_data: str | None = None) -> None:
         self.raw_data = raw_data

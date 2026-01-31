@@ -1,6 +1,4 @@
-"""
-Response types and data models.
-"""
+"""Response types and data models."""
 
 from __future__ import annotations
 

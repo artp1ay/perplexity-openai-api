@@ -1,6 +1,4 @@
-"""
-AI model definitions for Perplexity WebUI Scraper.
-"""
+"""AI model definitions."""
 
 from __future__ import annotations
 
@@ -9,27 +7,17 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class Model:
-    """
-    AI model configuration.
-
-    Attributes:
-        identifier: Model identifier used by the API.
-        mode: Model execution mode. Default: "copilot".
-    """
+    """AI model configuration."""
 
     identifier: str
     mode: str = "copilot"
 
 
 class Models:
-    """
-    Available AI models with their configurations.
-
-    All models use the "copilot" mode which enables web search.
-    """
+    """Available AI models (all use copilot mode with web search)."""
 
     DEEP_RESEARCH = Model(identifier="pplx_alpha")
-    """Deep Research - Create in-depth reports  with more sources, charts, and advanced reasoning."""
+    """Deep Research - Create in-depth reports with more sources, charts, and advanced reasoning."""
 
     CREATE_FILES_AND_APPS = Model(identifier="pplx_beta")
     """Create files and apps (previously known as Labs) - Turn your ideas into docs, slides, dashboards, and more."""
@@ -61,11 +49,11 @@ class Models:
     CLAUDE_45_SONNET_THINKING = Model(identifier="claude45sonnetthinking")
     """Claude Sonnet 4.5 Thinking - Anthropic's fast model (thinking)."""
 
-    CLAUDE_45_OPUS = Model(identifier="claude45opus")  # TODO: check correct identifier and description
+    CLAUDE_45_OPUS = Model(identifier="claude45opus")  # TODO: check correct identifier
     """Claude Opus 4.5 - Anthropic's Opus reasoning model."""
 
-    CLAUDE_45_OPUS_THINKING = Model(identifier="claude45opusthinking")  # TODO: check correct identifier and description
-    """Claude Opus 4.5 Thinking - Anthropic's Opus reasoning model with thinking."""
+    CLAUDE_45_OPUS_THINKING = Model(identifier="claude45opusthinking")  # TODO: check correct identifier
+    """Claude Opus 4.5 Thinking - Anthropic's Opus reasoning model (thinking)."""
 
     GROK_41 = Model(identifier="grok41nonreasoning")
     """Grok 4.1 - xAI's latest model."""

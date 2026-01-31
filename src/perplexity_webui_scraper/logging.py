@@ -1,6 +1,4 @@
-"""
-Logging configuration using loguru.
-"""
+"""Logging configuration using loguru."""
 
 from __future__ import annotations
 
@@ -32,7 +30,6 @@ def configure_logging(
     if level_str == "DISABLED":
         logger.disable("perplexity_webui_scraper")
         _logging_configured = False
-
         return None
 
     logger.enable("perplexity_webui_scraper")

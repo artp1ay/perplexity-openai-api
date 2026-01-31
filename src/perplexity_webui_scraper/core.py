@@ -1,6 +1,4 @@
-"""
-Core client implementation.
-"""
+"""Core client implementation."""
 
 from __future__ import annotations
 
@@ -47,13 +45,7 @@ class Perplexity:
     __slots__ = ("_http",)
 
     def __init__(self, session_token: str, config: ClientConfig | None = None) -> None:
-        """
-        Initialize with session token.
-
-        Args:
-            session_token: Perplexity session cookie (__Secure-next-auth.session-token).
-            config: Optional HTTP client configuration.
-        """
+        """Initialize with session token."""
 
         if not session_token or not session_token.strip():
             raise ValueError("session_token cannot be empty")
@@ -221,6 +213,7 @@ class Conversation:
             )
 
         result: list[_FileInfo] = []
+
         for path in file_list:
             file_path = path.as_posix()
 
@@ -294,8 +287,10 @@ class Conversation:
                 file_content = f.read()
 
             mime = CurlMime()
+
             for field_name, field_value in fields.items():
                 mime.addpart(name=field_name, data=field_value)
+
             mime.addpart(
                 name="file",
                 content_type=file_info.mimetype,
@@ -305,6 +300,7 @@ class Conversation:
 
             with Session() as s3_session:
                 upload_response = s3_session.post(s3_bucket_url, multipart=mime)
+
             mime.close()
 
             if upload_response.status_code not in (200, 201, 204):
@@ -392,12 +388,12 @@ class Conversation:
             return loads(line[6:])
         if isinstance(line, str) and line.startswith("data: "):
             return loads(line[6:])
+
         return None
 
     def _process_data(self, data: dict[str, Any]) -> None:
         """Process SSE data chunk and update conversation state."""
 
-        # Extract metadata from SSE root (always update as new data arrives)
         if "backend_uuid" in data:
             self._backend_uuid = data["backend_uuid"]
 
@@ -425,7 +421,6 @@ class Conversation:
 
                 if step_type == "RESEARCH_CLARIFYING_QUESTIONS":
                     questions = self._extract_clarifying_questions(item)
-
                     raise ResearchClarifyingQuestionsError(questions)
 
                 if step_type == "FINAL":
@@ -437,15 +432,14 @@ class Conversation:
                     else:
                         answer_data = raw_content
 
-                    # Check for thread_title in answer_data too
                     title = data.get("thread_title") or answer_data.get("thread_title")
                     self._update_state(title, answer_data)
-
                     break
+
         elif isinstance(json_data, dict):
-            # Check for thread_title in json_data too
             title = data.get("thread_title") or json_data.get("thread_title")
             self._update_state(title, json_data)
+
         else:
             raise ResponseParsingError(
                 "Unexpected JSON structure in 'text' field",
@@ -471,8 +465,10 @@ class Conversation:
                 for value in content.values():
                     if isinstance(value, str) and "?" in value:
                         questions.append(value)
+
         elif isinstance(content, list):
             questions = [str(q) for q in content if q]
+
         elif isinstance(content, str):
             questions = [content]
 

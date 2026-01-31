@@ -1,6 +1,4 @@
-"""
-Enums for Perplexity WebUI Scraper configuration options.
-"""
+"""Enums for configuration options."""
 
 from __future__ import annotations
 
@@ -8,140 +6,80 @@ from enum import Enum
 
 
 class CitationMode(str, Enum):
-    """
-    Citation formatting modes for response text.
-
-    Controls how citation markers (e.g., [1], [2]) are formatted in the response.
-    """
+    """Citation formatting modes for response text."""
 
     DEFAULT = "default"
-    """
-    Keep original Perplexity citation format (e.g., 'This is a citation[1]').
-    """
+    """Keep original format (e.g., 'text[1]')."""
 
     MARKDOWN = "markdown"
-    """
-    Convert citations to markdown links (e.g., 'This is a citation[1](https://example.com)').
-    """
+    """Convert to markdown links (e.g., 'text[1](url)')."""
 
     CLEAN = "clean"
-    """
-    Remove all citation markers (e.g., 'This is a citation').
-    """
+    """Remove all citation markers."""
 
 
 class SearchFocus(str, Enum):
-    """
-    Search focus types that control the type of search performed.
-
-    Determines whether to search the web or focus on writing tasks.
-    """
+    """Search focus types."""
 
     WEB = "internet"
-    """
-    Search the web for information. Best for factual queries and research.
-    """
+    """Search the web for information."""
 
     WRITING = "writing"
-    """
-    Focus on writing tasks. Best for creative writing, editing, and text generation.
-    """
+    """Focus on writing tasks."""
 
 
 class SourceFocus(str, Enum):
-    """
-    Source focus types that control which sources to prioritize.
-
-    Can be combined (e.g., [SourceFocus.WEB, SourceFocus.ACADEMIC]) for multi-source searches.
-    """
+    """Source focus types for search prioritization."""
 
     WEB = "web"
-    """
-    Search across the entire internet. General web search.
-    """
+    """General web search."""
 
     ACADEMIC = "scholar"
-    """
-    Search academic papers and scholarly articles (Google Scholar, etc.).
-    """
+    """Academic papers and scholarly articles."""
 
     SOCIAL = "social"
-    """
-    Search social media for discussions and opinions (Reddit, Twitter, etc.).
-    """
+    """Social media (Reddit, Twitter, etc.)."""
 
     FINANCE = "edgar"
-    """
-    Search SEC EDGAR filings for financial and corporate documents.
-    """
+    """SEC EDGAR filings."""
 
 
 class TimeRange(str, Enum):
-    """
-    Time range filters for search results.
-
-    Controls how recent the sources should be.
-    """
+    """Time range filters for search results."""
 
     ALL = ""
-    """
-    Include sources from all time. No time restriction.
-    """
+    """No time restriction."""
 
     TODAY = "DAY"
-    """
-    Include only sources from today (last 24 hours).
-    """
+    """Last 24 hours."""
 
     LAST_WEEK = "WEEK"
-    """
-    Include sources from the last 7 days.
-    """
+    """Last 7 days."""
 
     LAST_MONTH = "MONTH"
-    """
-    Include sources from the last 30 days.
-    """
+    """Last 30 days."""
 
     LAST_YEAR = "YEAR"
-    """
-    Include sources from the last 365 days.
-    """
+    """Last 365 days."""
 
 
 class LogLevel(str, Enum):
-    """
-    Logging level configuration.
-
-    Controls the verbosity of logging output. DISABLED is the default.
-    """
+    """Logging level configuration."""
 
     DISABLED = "DISABLED"
-    """
-    Completely disable all logging output. This is the default.
-    """
+    """Disable all logging (default)."""
 
     DEBUG = "DEBUG"
-    """
-    Show all messages including internal debug information.
-    """
+    """Show all messages including debug info."""
 
     INFO = "INFO"
-    """
-    Show informational messages, warnings, and errors.
-    """
+    """Show info, warnings, and errors."""
 
     WARNING = "WARNING"
-    """
-    Show only warnings and errors.
-    """
+    """Show warnings and errors only."""
 
     ERROR = "ERROR"
-    """
-    Show only error messages.
-    """
+    """Show errors only."""
 
     CRITICAL = "CRITICAL"
-    """
-    Show only critical/fatal errors.
-    """
+    """Show critical/fatal errors only."""

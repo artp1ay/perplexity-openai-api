@@ -1,6 +1,4 @@
-"""
-Extract AI responses from Perplexity's web interface.
-"""
+"""Extract AI responses from Perplexity's web interface."""
 
 from importlib import metadata
 
@@ -22,7 +20,6 @@ from .models import Model, Models
 from .types import Coordinates, Response, SearchResultItem
 
 
-# Rebuild Pydantic models to resolve forward references (Model, Coordinates)
 ConversationConfig.model_rebuild()
 
 
