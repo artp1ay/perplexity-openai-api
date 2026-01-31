@@ -25,7 +25,7 @@ classifiers = [
 dependencies = [
     "curl-cffi>=0.14.0",
     "loguru>=0.7.3",
-    "orjson>=3.11.5",
+    "orjson>=3.11.6",
     "pydantic>=2.12.5",
     "tenacity>=9.1.2",
 ]
@@ -41,7 +41,7 @@ dev = [
 ]
 lint = [
     "ruff>=0.14.14",
-    "ty>=0.0.13",
+    "ty>=0.0.14",
 ]
 tests = [
     "pytest>=9.0.2",
