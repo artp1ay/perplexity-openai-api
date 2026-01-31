@@ -14,26 +14,42 @@ Python scraper to extract AI responses from [Perplexity's](https://www.perplexit
 
 ## Installation
 
+### As a Library
+
 ```bash
-uv pip install perplexity-webui-scraper  # from PyPI (stable)
-uv pip install git+https://github.com/henrique-coder/perplexity-webui-scraper.git@dev  # from GitHub (development)
+# From PyPI (stable)
+uv add perplexity-webui-scraper
+
+# From GitHub dev branch (latest features)
+uv add git+https://github.com/henrique-coder/perplexity-webui-scraper.git@dev
+```
+
+### As MCP Server
+
+No installation required - `uvx` handles everything automatically:
+
+```bash
+# From PyPI (stable)
+uvx --from perplexity-webui-scraper[mcp] perplexity-webui-scraper-mcp
+
+# From GitHub dev branch (latest features)
+uvx --from "perplexity-webui-scraper[mcp] @ git+https://github.com/henrique-coder/perplexity-webui-scraper.git@dev" perplexity-webui-scraper-mcp
+
+# From local directory (for development)
+uv --directory /path/to/perplexity-webui-scraper run perplexity-webui-scraper-mcp
 ```
 
 ## Requirements
 
 - **Perplexity Pro/Max account**
-- **Session token** (`__Secure-next-auth.session-token` cookie from your browser)
+- **Session token** (`__Secure-next-auth.session-token` cookie)
 
 ### Getting Your Session Token
 
-You can obtain your session token in two ways:
-
 #### Option 1: Automatic (CLI Tool)
 
-The package includes a CLI tool to automatically generate and save your session token:
-
 ```bash
-get-perplexity-session-token
+uv run get-perplexity-session-token
 ```
 
 This interactive tool will:
@@ -44,16 +60,7 @@ This interactive tool will:
 4. Extract and display your session token
 5. Optionally save it to your `.env` file
 
-**Features:**
-
-- Secure ephemeral session (cleared on exit)
-- Automatic `.env` file management
-- Support for both OTP codes and magic links
-- Clean terminal interface with status updates
-
 #### Option 2: Manual (Browser)
-
-If you prefer to extract the token manually:
 
 1. Log in at [perplexity.ai](https://www.perplexity.ai)
 2. Open DevTools (`F12`) → Application/Storage → Cookies
@@ -71,7 +78,7 @@ conversation = client.create_conversation()
 conversation.ask("What is quantum computing?")
 print(conversation.answer)
 
-# Follow-up
+# Follow-up (context is preserved)
 conversation.ask("Explain it simpler")
 print(conversation.answer)
 ```
@@ -94,17 +101,17 @@ from perplexity_webui_scraper import (
 )
 
 config = ConversationConfig(
-    model=Models.RESEARCH,
+    model=Models.DEEP_RESEARCH,
     source_focus=[SourceFocus.WEB, SourceFocus.ACADEMIC],
     language="en-US",
-    coordinates=Coordinates(latitude=40.7128, longitude=-74.0060),
+    coordinates=Coordinates(latitude=12.3456, longitude=-98.7654),
 )
 
 conversation = client.create_conversation(config)
 conversation.ask("Latest AI research", files=["paper.pdf"])
 ```
 
-## API
+## API Reference
 
 ### `Perplexity(session_token, config?)`
 
@@ -127,22 +134,22 @@ conversation.ask("Latest AI research", files=["paper.pdf"])
 
 | Model                              | Description                                                               |
 | ---------------------------------- | ------------------------------------------------------------------------- |
-| `Models.RESEARCH`                  | Research - Fast and thorough for routine research                         |
-| `Models.LABS`                      | Labs - Multi-step tasks with advanced troubleshooting                     |
-| `Models.BEST`                      | Best - Automatically selects the most responsive model based on the query |
-| `Models.SONAR`                     | Sonar - Perplexity's fast model                                           |
+| `Models.BEST`                      | Automatically selects the best model based on the query                   |
+| `Models.DEEP_RESEARCH`             | Create in-depth reports with more sources, charts, and advanced reasoning |
+| `Models.CREATE_FILES_AND_APPS`     | Turn your ideas into docs, slides, dashboards, and more                   |
+| `Models.SONAR`                     | Perplexity's latest model                                                 |
 | `Models.GPT_52`                    | GPT-5.2 - OpenAI's latest model                                           |
-| `Models.GPT_52_THINKING`           | GPT-5.2 Thinking - OpenAI's latest model with thinking                    |
+| `Models.GPT_52_THINKING`           | GPT-5.2 - OpenAI's latest model (thinking)                                |
+| `Models.CLAUDE_45_SONNET`          | Claude Sonnet 4.5 - Anthropic's fast model                                |
+| `Models.CLAUDE_45_SONNET_THINKING` | Claude Sonnet 4.5 - Anthropic's fast model (thinking)                     |
 | `Models.CLAUDE_45_OPUS`            | Claude Opus 4.5 - Anthropic's Opus reasoning model                        |
-| `Models.CLAUDE_45_OPUS_THINKING`   | Claude Opus 4.5 Thinking - Anthropic's Opus reasoning model with thinking |
-| `Models.GEMINI_3_PRO`              | Gemini 3 Pro - Google's newest reasoning model                            |
-| `Models.GEMINI_3_FLASH`            | Gemini 3 Flash - Google's fast reasoning model                            |
-| `Models.GEMINI_3_FLASH_THINKING`   | Gemini 3 Flash Thinking - Google's fast reasoning model with thinking     |
-| `Models.GROK_41`                   | Grok 4.1 - xAI's latest advanced model                                    |
-| `Models.GROK_41_THINKING`          | Grok 4.1 Thinking - xAI's latest reasoning model                          |
-| `Models.KIMI_K2_THINKING`          | Kimi K2 Thinking - Moonshot AI's latest reasoning model                   |
-| `Models.CLAUDE_45_SONNET`          | Claude Sonnet 4.5 - Anthropic's newest advanced model                     |
-| `Models.CLAUDE_45_SONNET_THINKING` | Claude Sonnet 4.5 Thinking - Anthropic's newest reasoning model           |
+| `Models.CLAUDE_45_OPUS_THINKING`   | Claude Opus 4.5 - Anthropic's Opus reasoning model (thinking)             |
+| `Models.GEMINI_3_FLASH`            | Gemini 3 Flash - Google's fast model                                      |
+| `Models.GEMINI_3_FLASH_THINKING`   | Gemini 3 Flash - Google's fast model (thinking)                           |
+| `Models.GEMINI_3_PRO_THINKING`     | Gemini 3 Pro - Google's most advanced model (thinking)                    |
+| `Models.GROK_41`                   | Grok 4.1 - xAI's latest model                                             |
+| `Models.GROK_41_THINKING`          | Grok 4.1 - xAI's latest model (thinking)                                  |
+| `Models.KIMI_K25_THINKING`         | Kimi K2.5 - Moonshot AI's latest model                                    |
 
 ### CitationMode
 
@@ -168,76 +175,39 @@ conversation.ask("Latest AI research", files=["paper.pdf"])
 
 ## Exceptions
 
-The library provides specific exception types for better error handling:
-
-| Exception                          | Description                                                  |
-| ---------------------------------- | ------------------------------------------------------------ |
-| `PerplexityError`                  | Base exception for all library errors                        |
-| `AuthenticationError`              | Session token is invalid or expired (HTTP 403)               |
-| `RateLimitError`                   | Rate limit exceeded (HTTP 429)                               |
-| `FileUploadError`                  | File upload failed                                           |
-| `FileValidationError`              | File validation failed (size, type, etc.)                    |
-| `ResearchClarifyingQuestionsError` | Research mode is asking clarifying questions (not supported) |
-| `ResponseParsingError`             | API response could not be parsed                             |
-| `StreamingError`                   | Error during streaming response                              |
-
-### Handling Research Mode Clarifying Questions
-
-When using Research mode (`Models.RESEARCH`), the API may ask clarifying questions before providing an answer. Since programmatic interaction is not supported, the library raises a `ResearchClarifyingQuestionsError` with the questions:
-
-```python
-from perplexity_webui_scraper import (
-    Perplexity,
-    ResearchClarifyingQuestionsError,
-)
-
-try:
-    conversation.ask("Research this topic", model=Models.RESEARCH)
-except ResearchClarifyingQuestionsError as error:
-    print("The AI needs clarification:")
-    for question in error.questions:
-        print(f"  - {question}")
-    # Consider rephrasing your query to be more specific
-```
+| Exception                          | Description                                        |
+| ---------------------------------- | -------------------------------------------------- |
+| `PerplexityError`                  | Base exception for all library errors              |
+| `HTTPError`                        | HTTP error with status code and response body      |
+| `AuthenticationError`              | Session token is invalid or expired (HTTP 401/403) |
+| `RateLimitError`                   | Rate limit exceeded (HTTP 429)                     |
+| `FileUploadError`                  | File upload failed                                 |
+| `FileValidationError`              | File validation failed (size, type, etc.)          |
+| `ResearchClarifyingQuestionsError` | Research mode asking clarifying questions          |
+| `ResponseParsingError`             | API response could not be parsed                   |
+| `StreamingError`                   | Error during streaming response                    |
 
 ## MCP Server (Model Context Protocol)
 
-The library includes an MCP server that allows AI assistants (like Claude) to search using Perplexity AI directly.
+The library includes an MCP server for AI assistants like Claude Desktop and Antigravity.
 
-### Installation
+Each AI model is exposed as a separate tool - enable only the ones you need to reduce agent context size.
 
-```bash
-uv pip install perplexity-webui-scraper[mcp]
-```
+### Configuration
 
-### Running the Server
+Add to your MCP config file (no installation required):
 
-```bash
-# Set your session token
-export PERPLEXITY_SESSION_TOKEN="your_token_here"  # For Linux/Mac
-set PERPLEXITY_SESSION_TOKEN="your_token_here"  # For Windows
-
-# Run with FastMCP
-uv run fastmcp run src/perplexity_webui_scraper/mcp/server.py
-
-# Or test with the dev inspector
-uv run fastmcp dev src/perplexity_webui_scraper/mcp/server.py
-```
-
-### Claude Desktop Configuration
-
-Add to `~/.config/claude/claude_desktop_config.json`:
+**Claude Desktop** (`~/.config/claude/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
-    "perplexity": {
-      "command": "uv",
+    "perplexity-webui-scraper": {
+      "command": "uvx",
       "args": [
-        "run",
-        "fastmcp",
-        "run",
-        "path/to/perplexity_webui_scraper/mcp/server.py"
+        "--from",
+        "perplexity-webui-scraper[mcp]",
+        "perplexity-webui-scraper-mcp"
       ],
       "env": {
         "PERPLEXITY_SESSION_TOKEN": "your_token_here"
@@ -247,19 +217,68 @@ Add to `~/.config/claude/claude_desktop_config.json`:
 }
 ```
 
-### Available Tool
+**From GitHub dev branch:**
 
-| Tool             | Description                                                                 |
-| ---------------- | --------------------------------------------------------------------------- |
-| `perplexity_ask` | Ask questions and get AI-generated answers with real-time data from the web |
+```json
+{
+  "mcpServers": {
+    "perplexity-webui-scraper": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "perplexity-webui-scraper[mcp] @ git+https://github.com/henrique-coder/perplexity-webui-scraper.git@dev",
+        "perplexity-webui-scraper-mcp"
+      ],
+      "env": {
+        "PERPLEXITY_SESSION_TOKEN": "your_token_here"
+      }
+    }
+  }
+}
+```
 
-**Parameters:**
+**From local directory (for development):**
 
-| Parameter      | Type  | Default  | Description                                                   |
-| -------------- | ----- | -------- | ------------------------------------------------------------- |
-| `query`        | `str` | -        | Question to ask (required)                                    |
-| `model`        | `str` | `"best"` | AI model (`best`, `research`, `gpt52`, `claude_sonnet`, etc.) |
-| `source_focus` | `str` | `"web"`  | Source type (`web`, `academic`, `social`, `finance`, `all`)   |
+```json
+{
+  "mcpServers": {
+    "perplexity-webui-scraper": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/absolute/path/to/perplexity-webui-scraper",
+        "run",
+        "perplexity-webui-scraper-mcp"
+      ],
+      "env": {
+        "PERPLEXITY_SESSION_TOKEN": "your_token_here"
+      }
+    }
+  }
+}
+```
+
+### Available Tools
+
+Each tool uses a specific AI model. Enable only the ones you need:
+
+| Tool                                | Model                  | Description                                   |
+| ----------------------------------- | ---------------------- | --------------------------------------------- |
+| `perplexity_ask`                    | Best                   | Auto-selects best model based on query        |
+| `perplexity_deep_research`          | Deep Research          | In-depth reports with more sources and charts |
+| `perplexity_sonar`                  | Sonar                  | Perplexity's latest model                     |
+| `perplexity_gpt52`                  | GPT-5.2                | OpenAI's latest model                         |
+| `perplexity_gpt52_thinking`         | GPT-5.2 Thinking       | OpenAI's latest model (thinking)              |
+| `perplexity_claude_sonnet`          | Claude Sonnet 4.5      | Anthropic's fast model                        |
+| `perplexity_claude_sonnet_thinking` | Claude Sonnet Thinking | Anthropic's fast model (thinking)             |
+| `perplexity_gemini_flash`           | Gemini 3 Flash         | Google's fast model                           |
+| `perplexity_gemini_flash_thinking`  | Gemini Flash Thinking  | Google's fast model (thinking)                |
+| `perplexity_gemini_pro_thinking`    | Gemini 3 Pro           | Google's most advanced model (thinking)       |
+| `perplexity_grok`                   | Grok 4.1               | xAI's latest model                            |
+| `perplexity_grok_thinking`          | Grok 4.1 Thinking      | xAI's latest model (thinking)                 |
+| `perplexity_kimi_thinking`          | Kimi K2.5              | Moonshot AI's latest model                    |
+
+**All tools support `source_focus`:** `web`, `academic`, `social`, `finance`, `all`
 
 ## Disclaimer
 

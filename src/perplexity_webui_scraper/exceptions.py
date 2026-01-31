@@ -1,15 +1,13 @@
-"""
-Custom exceptions for Perplexity WebUI Scraper.
-"""
+"""Custom exceptions."""
 
 from __future__ import annotations
 
 
 __all__: list[str] = [
     "AuthenticationError",
-    "CloudflareBlockError",
     "FileUploadError",
     "FileValidationError",
+    "HTTPError",
     "PerplexityError",
     "RateLimitError",
     "ResearchClarifyingQuestionsError",
@@ -21,50 +19,47 @@ __all__: list[str] = [
 class PerplexityError(Exception):
     """Base exception for all Perplexity-related errors."""
 
-    def __init__(self, message: str, status_code: int | None = None) -> None:
+    def __init__(self, message: str) -> None:
         self.message = message
-        self.status_code = status_code
         super().__init__(message)
 
 
-class AuthenticationError(PerplexityError):
+class HTTPError(PerplexityError):
+    """Raised when an HTTP request fails."""
+
+    def __init__(
+        self,
+        message: str,
+        status_code: int | None = None,
+        url: str | None = None,
+        response_body: str | None = None,
+    ) -> None:
+        self.status_code = status_code
+        self.url = url
+        self.response_body = response_body[:500] if response_body and len(response_body) > 500 else response_body
+        super().__init__(message)
+
+    def __repr__(self) -> str:
+        return f"HTTPError(status={self.status_code}, url={self.url!r}, message={self.message!r})"
+
+
+class AuthenticationError(HTTPError):
     """Raised when session token is invalid or expired (HTTP 403)."""
 
     def __init__(self, message: str | None = None) -> None:
         super().__init__(
-            message
-            or "Access forbidden (403). Your session token is invalid or expired. "
-            "Please obtain a new session token from your browser cookies.",
+            message or "Access forbidden (403). Session token invalid or expired.",
             status_code=403,
         )
 
 
-class RateLimitError(PerplexityError):
+class RateLimitError(HTTPError):
     """Raised when rate limit is exceeded (HTTP 429)."""
 
     def __init__(self, message: str | None = None) -> None:
         super().__init__(
-            message or "Rate limit exceeded (429). Please wait a moment before trying again.",
+            message or "Rate limit exceeded (429). Please wait before retrying.",
             status_code=429,
-        )
-
-
-class CloudflareBlockError(PerplexityError):
-    """
-    Raised when Cloudflare blocks the request with a challenge page.
-
-    This typically means the request triggered Cloudflare's bot detection.
-    The client will automatically retry with fingerprint rotation, but if
-    this exception is raised, all retry attempts have failed.
-    """
-
-    def __init__(self, message: str | None = None) -> None:
-        super().__init__(
-            message
-            or "Cloudflare challenge detected. The request was blocked by Cloudflare's "
-            "bot protection. Try waiting a few minutes before retrying, or obtain a "
-            "fresh session token.",
-            status_code=403,
         )
 
 
@@ -85,34 +80,18 @@ class FileValidationError(PerplexityError):
 
 
 class ResearchClarifyingQuestionsError(PerplexityError):
-    """
-    Raised when Research mode requires clarifying questions.
-
-    This library does not support programmatic interaction with clarifying questions.
-    Consider rephrasing your query to be more specific.
-
-    Attributes:
-        questions: List of clarifying questions from the API.
-    """
+    """Raised when Research mode requires clarifying questions."""
 
     def __init__(self, questions: list[str]) -> None:
         self.questions = questions
-        questions_text = "\n".join(f"  - {q}" for q in questions) if questions else "  (no questions provided)"
-
+        questions_text = "\n".join(f"  - {q}" for q in questions) if questions else "  (none)"
         super().__init__(
-            f"Research mode is asking clarifying questions:\n{questions_text}\n\n"
-            "Programmatic interaction with clarifying questions is not supported. "
-            "Please rephrase your query to be more specific."
+            f"Research mode requires clarification:\n{questions_text}\nPlease rephrase your query to be more specific."
         )
 
 
 class ResponseParsingError(PerplexityError):
-    """
-    Raised when the API response cannot be parsed.
-
-    Attributes:
-        raw_data: The raw data that failed to parse.
-    """
+    """Raised when the API response cannot be parsed."""
 
     def __init__(self, message: str, raw_data: str | None = None) -> None:
         self.raw_data = raw_data
