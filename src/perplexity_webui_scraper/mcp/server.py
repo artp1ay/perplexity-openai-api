@@ -88,95 +88,27 @@ def _ask(query: str, model: Model, source_focus: SourceFocusName = "web") -> str
         return f"Error: {error!s}"
 
 
-@mcp.tool
-def pplx_ask(query: str, source_focus: SourceFocusName = "web") -> str:
-    """Ask a question with real-time data from the internet (auto-selects best model)."""
+def _create_tool_function(model: Model) -> None:
+    """Dynamically create and register a tool for a model."""
 
-    return _ask(query, Models.BEST, source_focus)
+    def tool_fn(query: str, source_focus: SourceFocusName = "web") -> str:
 
+        return _ask(query, model, source_focus)
 
-@mcp.tool
-def pplx_deep_research(query: str, source_focus: SourceFocusName = "web") -> str:
-    """Deep Research - In-depth reports with more sources, charts, and advanced reasoning."""
+    tool_fn.__name__ = model.tool_name
+    tool_fn.__doc__ = f"{model.name} - {model.description}"
 
-    return _ask(query, Models.DEEP_RESEARCH, source_focus)
-
-
-@mcp.tool
-def pplx_sonar(query: str, source_focus: SourceFocusName = "web") -> str:
-    """Sonar - Perplexity's latest model."""
-
-    return _ask(query, Models.SONAR, source_focus)
+    mcp.tool(tool_fn)
 
 
-@mcp.tool
-def pplx_gpt52(query: str, source_focus: SourceFocusName = "web") -> str:
-    """GPT-5.2 - OpenAI's latest model."""
+def _register_all_tools() -> None:
+    """Register all model tools dynamically."""
 
-    return _ask(query, Models.GPT_52, source_focus)
-
-
-@mcp.tool
-def pplx_gpt52_thinking(query: str, source_focus: SourceFocusName = "web") -> str:
-    """GPT-5.2 Thinking - OpenAI's latest model with extended thinking."""
-
-    return _ask(query, Models.GPT_52_THINKING, source_focus)
+    for model in Models.all():
+        _create_tool_function(model)
 
 
-@mcp.tool
-def pplx_claude_sonnet(query: str, source_focus: SourceFocusName = "web") -> str:
-    """Claude Sonnet 4.5 - Anthropic's fast model."""
-
-    return _ask(query, Models.CLAUDE_45_SONNET, source_focus)
-
-
-@mcp.tool
-def pplx_claude_sonnet_think(query: str, source_focus: SourceFocusName = "web") -> str:
-    """Claude Sonnet 4.5 Thinking - Anthropic's fast model with extended thinking."""
-
-    return _ask(query, Models.CLAUDE_45_SONNET_THINKING, source_focus)
-
-
-@mcp.tool
-def pplx_gemini_flash(query: str, source_focus: SourceFocusName = "web") -> str:
-    """Gemini 3 Flash - Google's fast model."""
-
-    return _ask(query, Models.GEMINI_3_FLASH, source_focus)
-
-
-@mcp.tool
-def pplx_gemini_flash_think(query: str, source_focus: SourceFocusName = "web") -> str:
-    """Gemini 3 Flash Thinking - Google's fast model with extended thinking."""
-
-    return _ask(query, Models.GEMINI_3_FLASH_THINKING, source_focus)
-
-
-@mcp.tool
-def pplx_gemini_pro_think(query: str, source_focus: SourceFocusName = "web") -> str:
-    """Gemini 3 Pro Thinking - Google's most advanced model with extended thinking."""
-
-    return _ask(query, Models.GEMINI_3_PRO_THINKING, source_focus)
-
-
-@mcp.tool
-def pplx_grok(query: str, source_focus: SourceFocusName = "web") -> str:
-    """Grok 4.1 - xAI's latest model."""
-
-    return _ask(query, Models.GROK_41, source_focus)
-
-
-@mcp.tool
-def pplx_grok_thinking(query: str, source_focus: SourceFocusName = "web") -> str:
-    """Grok 4.1 Thinking - xAI's latest model with extended thinking."""
-
-    return _ask(query, Models.GROK_41_THINKING, source_focus)
-
-
-@mcp.tool
-def pplx_kimi_thinking(query: str, source_focus: SourceFocusName = "web") -> str:
-    """Kimi K2.5 Thinking - Moonshot AI's latest model."""
-
-    return _ask(query, Models.KIMI_K25_THINKING, source_focus)
+_register_all_tools()
 
 
 def main() -> None:
