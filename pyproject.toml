@@ -27,7 +27,7 @@ dependencies = [
     "loguru>=0.7.3",
     "orjson>=3.11.7",
     "pydantic>=2.12.5",
-    "tenacity>=9.1.2",
+    "tenacity>=9.1.4",
 ]
 
 [dependency-groups]
@@ -35,13 +35,13 @@ dev = [
     "beautifulsoup4>=4.14.3",
     "jsbeautifier>=1.15.4",
     "lxml>=6.0.2",
-    "prek>=0.3.1",
+    "prek>=0.3.2",
     "python-dotenv>=1.2.1",
     "rich>=14.3.2",
 ]
 lint = [
     "ruff>=0.15.0",
-    "ty>=0.0.14",
+    "ty>=0.0.15",
 ]
 tests = [
     "pytest>=9.0.2",
