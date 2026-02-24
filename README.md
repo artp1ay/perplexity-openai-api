@@ -132,24 +132,24 @@ conversation.ask("Latest AI research", files=["paper.pdf"])
 
 ### Models
 
-| Model                              | Description                                                                         |
-| ---------------------------------- | ----------------------------------------------------------------------------------- |
-| `Models.BEST`                      | Best - Automatically selects the best model based on the query.                     |
-| `Models.DEEP_RESEARCH`             | Deep Research - Create in-depth reports with more sources, charts, and reasoning.   |
-| `Models.CREATE_FILES_AND_APPS`     | Create Files and Apps - Turn your ideas into docs, slides, dashboards, and more.    |
-| `Models.SONAR`                     | Sonar - Perplexity's latest model.                                                  |
-| `Models.GEMINI_3_FLASH`            | Gemini 3 Flash - Google's fast model.                                               |
-| `Models.GEMINI_3_FLASH_THINKING`   | Gemini 3 Flash Thinking - Google's fast model with extended thinking.               |
-| `Models.GEMINI_3_PRO_THINKING`     | Gemini 3 Pro Thinking - Google's most advanced model with extended thinking.        |
-| `Models.GPT_52`                    | GPT-5.2 - OpenAI's latest model.                                                    |
-| `Models.GPT_52_THINKING`           | GPT-5.2 Thinking - OpenAI's latest model with extended thinking.                    |
-| `Models.CLAUDE_45_SONNET`          | Claude Sonnet 4.5 - Anthropic's fast model.                                         |
-| `Models.CLAUDE_45_SONNET_THINKING` | Claude Sonnet 4.5 Thinking - Anthropic's fast model with extended thinking.         |
-| `Models.CLAUDE_46_OPUS`            | Claude Opus 4.6 - Anthropic's Opus reasoning model.                                 |
-| `Models.CLAUDE_46_OPUS_THINKING`   | Claude Opus 4.6 Thinking - Anthropic's Opus reasoning model with extended thinking. |
-| `Models.GROK_41`                   | Grok 4.1 - xAI's latest model.                                                      |
-| `Models.GROK_41_THINKING`          | Grok 4.1 Thinking - xAI's latest model with extended thinking.                      |
-| `Models.KIMI_K25_THINKING`         | Kimi K2.5 Thinking - Moonshot AI's latest model.                                    |
+| Model                              | Description                                                               | Tier |
+| ---------------------------------- | ------------------------------------------------------------------------- | ---- |
+| `Models.BEST`                      | Pro - Automatically selects the most responsive model based on the query  | pro  |
+| `Models.DEEP_RESEARCH`             | Deep research - Fast and thorough for routine research                    | pro  |
+| `Models.SONAR`                     | Sonar - Perplexity's latest model                                         | pro  |
+| `Models.GEMINI_3_FLASH`            | Gemini 3 Flash - Google's fast model                                      | pro  |
+| `Models.GEMINI_3_FLASH_THINKING`   | Gemini 3 Flash Thinking - Google's fast model                             | pro  |
+| `Models.GEMINI_31_PRO`             | Gemini 3.1 Pro - Google's latest model                                    | pro  |
+| `Models.GEMINI_31_PRO_THINKING`    | Gemini 3.1 Pro Thinking - Google's latest model with thinking             | pro  |
+| `Models.GPT_52`                    | GPT-5.2 - OpenAI's latest model                                           | pro  |
+| `Models.GPT_52_THINKING`           | GPT-5.2 Thinking - OpenAI's latest model with thinking                    | pro  |
+| `Models.CLAUDE_46_SONNET`          | Claude Sonnet 4.6 - Anthropic's fast model                                | pro  |
+| `Models.CLAUDE_46_SONNET_THINKING` | Claude Sonnet 4.6 Thinking - Anthropic's newest reasoning model           | pro  |
+| `Models.CLAUDE_46_OPUS`            | Claude Opus 4.6 - Anthropic's most advanced model                         | max  |
+| `Models.CLAUDE_46_OPUS_THINKING`   | Claude Opus 4.6 Thinking - Anthropic's Opus reasoning model with thinking | max  |
+| `Models.GROK_41`                   | Grok 4.1 - xAI's latest model                                             | pro  |
+| `Models.GROK_41_THINKING`          | Grok 4.1 Thinking - xAI's latest model                                    | pro  |
+| `Models.KIMI_K25_THINKING`         | Kimi K2.5 - Moonshot AI's latest model                                    | pro  |
 
 ### CitationMode
 
@@ -262,21 +262,24 @@ Add to your MCP config file (no installation required):
 
 Each tool uses a specific AI model. Enable only the ones you need:
 
-| Tool                                | Model                  | Description                                   |
-| ----------------------------------- | ---------------------- | --------------------------------------------- |
-| `perplexity_ask`                    | Best                   | Auto-selects best model based on query        |
-| `perplexity_deep_research`          | Deep Research          | In-depth reports with more sources and charts |
-| `perplexity_sonar`                  | Sonar                  | Perplexity's latest model                     |
-| `perplexity_gpt52`                  | GPT-5.2                | OpenAI's latest model                         |
-| `perplexity_gpt52_thinking`         | GPT-5.2 Thinking       | OpenAI's latest model (thinking)              |
-| `perplexity_claude_sonnet`          | Claude Sonnet 4.5      | Anthropic's fast model                        |
-| `perplexity_claude_sonnet_thinking` | Claude Sonnet Thinking | Anthropic's fast model (thinking)             |
-| `perplexity_gemini_flash`           | Gemini 3 Flash         | Google's fast model                           |
-| `perplexity_gemini_flash_thinking`  | Gemini Flash Thinking  | Google's fast model (thinking)                |
-| `perplexity_gemini_pro_thinking`    | Gemini 3 Pro           | Google's most advanced model (thinking)       |
-| `perplexity_grok`                   | Grok 4.1               | xAI's latest model                            |
-| `perplexity_grok_thinking`          | Grok 4.1 Thinking      | xAI's latest model (thinking)                 |
-| `perplexity_kimi_thinking`          | Kimi K2.5              | Moonshot AI's latest model                    |
+| Tool                      | Model                      | Description                                                        | Tier |
+| ------------------------- | -------------------------- | ------------------------------------------------------------------ | ---- |
+| `pplx_ask`                | Pro                        | Automatically selects the most responsive model based on the query | pro  |
+| `pplx_deep_research`      | Deep research              | Fast and thorough for routine research                             | pro  |
+| `pplx_sonar`              | Sonar                      | Perplexity's latest model                                          | pro  |
+| `pplx_gemini_flash`       | Gemini 3 Flash             | Google's fast model                                                | pro  |
+| `pplx_gemini_flash_think` | Gemini 3 Flash Thinking    | Google's fast model                                                | pro  |
+| `pplx_gemini31_pro`       | Gemini 3.1 Pro             | Google's latest model                                              | pro  |
+| `pplx_gemini31_pro_think` | Gemini 3.1 Pro Thinking    | Google's latest model with thinking                                | pro  |
+| `pplx_gpt52`              | GPT-5.2                    | OpenAI's latest model                                              | pro  |
+| `pplx_gpt52_thinking`     | GPT-5.2 Thinking           | OpenAI's latest model with thinking                                | pro  |
+| `pplx_claude_s46`         | Claude Sonnet 4.6          | Anthropic's fast model                                             | pro  |
+| `pplx_claude_s46_think`   | Claude Sonnet 4.6 Thinking | Anthropic's newest reasoning model                                 | pro  |
+| `pplx_claude_o46`         | Claude Opus 4.6            | Anthropic's most advanced model                                    | max  |
+| `pplx_claude_o46_think`   | Claude Opus 4.6 Thinking   | Anthropic's Opus reasoning model with thinking                     | max  |
+| `pplx_grok41`             | Grok 4.1                   | xAI's latest model                                                 | pro  |
+| `pplx_grok41_think`       | Grok 4.1 Thinking          | xAI's latest model                                                 | pro  |
+| `pplx_kimi_k25_think`     | Kimi K2.5                  | Moonshot AI's latest model                                         | pro  |
 
 **All tools support `source_focus`:** `web`, `academic`, `social`, `finance`, `all`
 

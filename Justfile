@@ -13,6 +13,3 @@ format:
 
 install:
     uv sync --upgrade --all-extras --all-groups
-
-test:
-    uv run pytest -v --xfail-tb
