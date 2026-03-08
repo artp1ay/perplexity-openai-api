@@ -20,7 +20,7 @@ Python scraper to extract AI responses from [Perplexity's](https://www.perplexit
 # From PyPI (stable)
 uv add perplexity-webui-scraper
 
-# From GitHub dev branch (latest features)
+# From GitHub prod branch (latest fixes)
 uv add git+https://github.com/henrique-coder/perplexity-webui-scraper.git@prod
 ```
 
@@ -32,7 +32,7 @@ No installation required - `uvx` handles everything automatically:
 # From PyPI (stable)
 uvx --from perplexity-webui-scraper[mcp]@latest perplexity-webui-scraper-mcp
 
-# From GitHub dev branch (latest features)
+# From GitHub prod branch (latest fixes)
 uvx --from "perplexity-webui-scraper[mcp]@git+https://github.com/henrique-coder/perplexity-webui-scraper.git@prod" perplexity-webui-scraper-mcp
 
 # From local directory (for development)
