@@ -271,8 +271,8 @@ Each tool uses a specific AI model. Enable only the ones you need:
 | `pplx_gemini_flash_think` | Gemini 3 Flash Thinking    | Google's fast model                                                | pro  |
 | `pplx_gemini31_pro`       | Gemini 3.1 Pro             | Google's latest model                                              | pro  |
 | `pplx_gemini31_pro_think` | Gemini 3.1 Pro Thinking    | Google's latest model with thinking                                | pro  |
-| `pplx_gpt52`              | GPT-5.2                    | OpenAI's latest model                                              | pro  |
-| `pplx_gpt52_thinking`     | GPT-5.2 Thinking           | OpenAI's latest model with thinking                                | pro  |
+| `pplx_gpt54`              | GPT-5.4                    | OpenAI's latest model                                              | pro  |
+| `pplx_gpt54_thinking`     | GPT-5.4 Thinking           | OpenAI's latest model with thinking                                | pro  |
 | `pplx_claude_s46`         | Claude Sonnet 4.6          | Anthropic's fast model                                             | pro  |
 | `pplx_claude_s46_think`   | Claude Sonnet 4.6 Thinking | Anthropic's newest reasoning model                                 | pro  |
 | `pplx_claude_o46`         | Claude Opus 4.6            | Anthropic's most advanced model                                    | max  |

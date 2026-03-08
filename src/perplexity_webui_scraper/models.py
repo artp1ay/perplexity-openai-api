@@ -84,22 +84,22 @@ class Models:
         tool_name="pplx_gemini31_pro_think",
     )
 
-    GPT_52: ClassVar[Model] = Model(
-        identifier="gpt52",
-        name="GPT-5.2",
+    GPT_54: ClassVar[Model] = Model(
+        identifier="gpt54",
+        name="GPT-5.4",
         description="OpenAI's latest model",
         mode="search",
         subscription_tier="pro",
-        tool_name="pplx_gpt52",
+        tool_name="pplx_gpt54",
     )
 
-    GPT_52_THINKING: ClassVar[Model] = Model(
-        identifier="gpt52_thinking",
-        name="GPT-5.2 Thinking",
+    GPT_54_THINKING: ClassVar[Model] = Model(
+        identifier="gpt54_thinking",
+        name="GPT-5.4 Thinking",
         description="OpenAI's latest model with thinking",
         mode="search",
         subscription_tier="pro",
-        tool_name="pplx_gpt52_thinking",
+        tool_name="pplx_gpt54_thinking",
     )
 
     CLAUDE_46_SONNET: ClassVar[Model] = Model(
@@ -177,8 +177,8 @@ class Models:
             cls.GEMINI_3_FLASH_THINKING,
             cls.GEMINI_31_PRO,
             cls.GEMINI_31_PRO_THINKING,
-            cls.GPT_52,
-            cls.GPT_52_THINKING,
+            cls.GPT_54,
+            cls.GPT_54_THINKING,
             cls.CLAUDE_46_SONNET,
             cls.CLAUDE_46_SONNET_THINKING,
             cls.CLAUDE_46_OPUS,
