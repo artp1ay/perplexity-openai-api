@@ -22,7 +22,7 @@ class Models:
     """Available AI models (all use copilot mode with web search)."""
 
     BEST: ClassVar[Model] = Model(
-        identifier="pplx_pro_upgraded",
+        identifier="default",
         name="Pro",
         description="Automatically selects the most responsive model based on the query",
         mode="search",

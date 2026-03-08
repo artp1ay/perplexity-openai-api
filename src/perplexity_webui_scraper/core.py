@@ -63,6 +63,7 @@ class Perplexity:
             retry_jitter=cfg.retry_jitter,
             requests_per_second=cfg.requests_per_second,
             rotate_fingerprint=cfg.rotate_fingerprint,
+            max_init_query_length=cfg.max_init_query_length,
         )
 
         logger.info("Perplexity client initialized")
@@ -406,12 +407,19 @@ class Conversation:
         if "text" not in data and "blocks" not in data:
             return None
 
+        if data.get("status") == "FAILED":
+            raise ResponseParsingError(
+                f"Query processing failed: {data.get('text', 'Unknown error')}",
+                raw_data=str(data),
+            )
+
         try:
             json_data = loads(data["text"])
         except KeyError as error:
             raise ValueError("Missing 'text' field in data") from error
-        except JSONDecodeError as error:
-            raise ValueError("Invalid JSON in 'text' field") from error
+        except JSONDecodeError:
+            json_data = data.copy()
+            json_data["answer"] = data.get("text")
 
         answer_data: dict[str, Any] = {}
 

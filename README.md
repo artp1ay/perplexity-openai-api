@@ -21,7 +21,7 @@ Python scraper to extract AI responses from [Perplexity's](https://www.perplexit
 uv add perplexity-webui-scraper
 
 # From GitHub dev branch (latest features)
-uv add git+https://github.com/henrique-coder/perplexity-webui-scraper.git@dev
+uv add git+https://github.com/henrique-coder/perplexity-webui-scraper.git@prod
 ```
 
 ### As MCP Server
@@ -33,7 +33,7 @@ No installation required - `uvx` handles everything automatically:
 uvx --from perplexity-webui-scraper[mcp]@latest perplexity-webui-scraper-mcp
 
 # From GitHub dev branch (latest features)
-uvx --from "perplexity-webui-scraper[mcp]@git+https://github.com/henrique-coder/perplexity-webui-scraper.git@dev" perplexity-webui-scraper-mcp
+uvx --from "perplexity-webui-scraper[mcp]@git+https://github.com/henrique-coder/perplexity-webui-scraper.git@prod" perplexity-webui-scraper-mcp
 
 # From local directory (for development)
 uv --directory /path/to/perplexity-webui-scraper run perplexity-webui-scraper-mcp
@@ -226,7 +226,7 @@ Add to your MCP config file (no installation required):
       "command": "uvx",
       "args": [
         "--from",
-        "perplexity-webui-scraper[mcp]@git+https://github.com/henrique-coder/perplexity-webui-scraper.git@dev",
+        "perplexity-webui-scraper[mcp]@git+https://github.com/henrique-coder/perplexity-webui-scraper.git@prod",
         "perplexity-webui-scraper-mcp"
       ],
       "env": {
