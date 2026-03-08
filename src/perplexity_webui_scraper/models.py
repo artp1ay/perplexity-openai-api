@@ -19,7 +19,11 @@ class Model:
 
 
 class Models:
-    """Available AI models (all use copilot mode with web search)."""
+    """Available AI models.
+
+    Most models require 'copilot' mode (Pro Search) to function correctly
+    with specific identifiers.
+    """
 
     BEST: ClassVar[Model] = Model(
         identifier="default",
@@ -43,7 +47,7 @@ class Models:
         identifier="experimental",
         name="Sonar",
         description="Perplexity's latest model",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_sonar",
     )
@@ -52,7 +56,7 @@ class Models:
         identifier="gemini30flash",
         name="Gemini 3 Flash",
         description="Google's fast model",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_gemini_flash",
     )
@@ -61,7 +65,7 @@ class Models:
         identifier="gemini30flash_high",
         name="Gemini 3 Flash Thinking",
         description="Google's fast model",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_gemini_flash_think",
     )
@@ -70,7 +74,7 @@ class Models:
         identifier="gemini31pro_low",
         name="Gemini 3.1 Pro",
         description="Google's latest model",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_gemini31_pro",
     )
@@ -79,7 +83,7 @@ class Models:
         identifier="gemini31pro_high",
         name="Gemini 3.1 Pro Thinking",
         description="Google's latest model with thinking",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_gemini31_pro_think",
     )
@@ -88,7 +92,7 @@ class Models:
         identifier="gpt54",
         name="GPT-5.4",
         description="OpenAI's latest model",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_gpt54",
     )
@@ -97,7 +101,7 @@ class Models:
         identifier="gpt54_thinking",
         name="GPT-5.4 Thinking",
         description="OpenAI's latest model with thinking",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_gpt54_thinking",
     )
@@ -106,7 +110,7 @@ class Models:
         identifier="claude46sonnet",
         name="Claude Sonnet 4.6",
         description="Anthropic's fast model",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_claude_s46",
     )
@@ -115,7 +119,7 @@ class Models:
         identifier="claude46sonnetthinking",
         name="Claude Sonnet 4.6 Thinking",
         description="Anthropic's newest reasoning model",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_claude_s46_think",
     )
@@ -124,7 +128,7 @@ class Models:
         identifier="claude46opus",
         name="Claude Opus 4.6",
         description="Anthropic's most advanced model",
-        mode="search",
+        mode="copilot",
         subscription_tier="max",
         tool_name="pplx_claude_o46",
     )
@@ -133,7 +137,7 @@ class Models:
         identifier="claude46opusthinking",
         name="Claude Opus 4.6 Thinking",
         description="Anthropic's Opus reasoning model with thinking",
-        mode="search",
+        mode="copilot",
         subscription_tier="max",
         tool_name="pplx_claude_o46_think",
     )
@@ -142,7 +146,7 @@ class Models:
         identifier="grok41nonreasoning",
         name="Grok 4.1",
         description="xAI's latest model",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_grok41",
     )
@@ -151,7 +155,7 @@ class Models:
         identifier="grok41reasoning",
         name="Grok 4.1 Thinking",
         description="xAI's latest model",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_grok41_think",
     )
@@ -160,7 +164,7 @@ class Models:
         identifier="kimik25thinking",
         name="Kimi K2.5",
         description="Moonshot AI's latest model",
-        mode="search",
+        mode="copilot",
         subscription_tier="pro",
         tool_name="pplx_kimi_k25_think",
     )
