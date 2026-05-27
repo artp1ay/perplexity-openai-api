@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from datetime import datetime
 import hashlib
 import json
 import logging
@@ -11,36 +15,27 @@ import re
 import sys
 import threading
 import time
+from typing import Any, cast
 import uuid
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, AsyncGenerator, Dict
 
-import uvicorn
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
+import uvicorn
+
 
 # Add src to path for local development
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from perplexity_webui_scraper import (
-    CitationMode,
-    Conversation,
-    ConversationConfig,
-    Models,
-    Perplexity,
-    PerplexityError
-)
-from perplexity_webui_scraper.models import Model
+from perplexity_webui_scraper import CitationMode, Conversation, ConversationConfig, Models, Perplexity, PerplexityError
 from perplexity_webui_scraper.fetch_models import ModelInfo as FetchedModelInfo
 from perplexity_webui_scraper.fetch_models import PerplexityModelsFetcher
+from perplexity_webui_scraper.models import Model
 
 
 # =============================================================================
@@ -50,34 +45,34 @@ from perplexity_webui_scraper.fetch_models import PerplexityModelsFetcher
 @dataclass
 class ServerConfig:
     """Server configuration loaded from environment variables."""
-    
+
     session_token: str
     api_key: str | None = None
     host: str = "0.0.0.0"
     port: int = 8000
     log_level: str = "INFO"
-    
+
     # Rate Limiting
     requests_per_minute: int = 60
     enable_rate_limiting: bool = True
-    
+
     # Conversations
     conversation_timeout: int = 3600
     max_conversations_per_user: int = 100
-    
+
     # Defaults
     default_model: str = "perplexity-auto"
     default_citation_mode: CitationMode = CitationMode.CLEAN
-    
+
     @classmethod
-    def from_env(cls) -> "ServerConfig":
+    def from_env(cls) -> ServerConfig:
         """Load configuration from environment variables."""
         try:
             from dotenv import load_dotenv
             load_dotenv()
         except ImportError:
             pass
-        
+
         session_token = os.getenv("PERPLEXITY_SESSION_TOKEN")
         if not session_token:
             print("❌ Error: PERPLEXITY_SESSION_TOKEN environment variable is required")
@@ -87,7 +82,7 @@ class ServerConfig:
             print("3. Copy the '__Secure-next-auth.session-token' value")
             print("4. Set it: export PERPLEXITY_SESSION_TOKEN='your_token'")
             sys.exit(1)
-        
+
         return cls(
             session_token=session_token,
             api_key=os.getenv("OPENAI_API_KEY"),
@@ -109,30 +104,30 @@ class ServerConfig:
 
 class ModelRegistry:
     """Manages available models fetched from Perplexity."""
-    
+
     def __init__(self):
         self._models: list[FetchedModelInfo] = []
         self._mapping: dict[str, Model] = {}
         self._available: list[dict[str, str]] = []
         self._last_fetch: datetime | None = None
         self._refresh_interval = 3600  # 1 hour
-    
+
     def fetch(self, session_token: str) -> None:
         """Fetch available models from Perplexity."""
         logging.info("🔄 Fetching models from Perplexity...")
-        
+
         try:
             with PerplexityModelsFetcher(session_token) as fetcher:
                 self._models = fetcher.fetch_models()
-            
+
             self._build_mappings()
             self._last_fetch = datetime.now()
             logging.info(f"✅ Loaded {len(self._models)} models")
-            
+
         except Exception as e:
             logging.error(f"❌ Failed to fetch models: {e}")
             self._use_defaults()
-    
+
     def _build_mappings(self) -> None:
         """Build model mappings and available list."""
         # Static aliases
@@ -150,14 +145,14 @@ class ModelRegistry:
             "research": Models.RESEARCH,
             "labs": Models.LABS,
         }
-        
+
         self._available = [
             {"id": "perplexity-auto", "name": "Perplexity Auto", "owned_by": "perplexity"},
             {"id": "perplexity-sonar", "name": "Perplexity Sonar", "owned_by": "perplexity"},
             {"id": "perplexity-research", "name": "Perplexity Research", "owned_by": "perplexity"},
             {"id": "perplexity-labs", "name": "Perplexity Labs", "owned_by": "perplexity"},
         ]
-        
+
         # Add fetched models
         for model in self._models:
             model_obj = Model(
@@ -168,14 +163,14 @@ class ModelRegistry:
                 subscription_tier="pro" if model.is_pro else "free",
                 source="fetched",
             )
-            
+
             # Add direct identifier
             self._mapping[model.identifier.lower()] = model_obj
-            
+
             # Add aliases
             for alias in self._generate_aliases(model.identifier):
                 self._mapping[alias.lower()] = model_obj
-            
+
             # Add to available list
             if not any(m["id"] == model.identifier for m in self._available):
                 self._available.append({
@@ -183,18 +178,18 @@ class ModelRegistry:
                     "name": model.name,
                     "owned_by": model.provider.lower(),
                 })
-    
+
     def _generate_aliases(self, identifier: str) -> list[str]:
         """Generate friendly aliases for a model identifier."""
         aliases = []
         id_lower = identifier.lower()
-        
+
         # GPT: gpt51 -> gpt-5.1, gpt-51
         if id_lower.startswith("gpt"):
             match = re.match(r'gpt(\d)(\d)', id_lower)
             if match:
                 aliases.extend([f"gpt-{match.group(1)}.{match.group(2)}", f"gpt-{match.group(1)}{match.group(2)}"])
-        
+
         # Claude: claude45sonnet -> claude-4.5-sonnet
         elif id_lower.startswith("claude"):
             if "opus" in id_lower:
@@ -207,27 +202,27 @@ class ModelRegistry:
                 if match:
                     v = match.group(1)
                     aliases.extend([f"claude-{v[0]}.{v[1:]}-sonnet" if len(v) > 1 else f"claude-{v}-sonnet"])
-        
+
         # Gemini: gemini30pro -> gemini-3-pro
         elif id_lower.startswith("gemini"):
             match = re.search(r'gemini(\d+)pro', id_lower)
             if match:
                 v = match.group(1)
                 aliases.extend([f"gemini-{v[0]}-pro", f"gemini-{v}-pro"])
-        
+
         # Grok: grok41 -> grok-4.1
         elif id_lower.startswith("grok"):
             match = re.search(r'grok(\d+)', id_lower)
             if match:
                 v = match.group(1)
                 aliases.extend([f"grok-{v[0]}.{v[1:]}" if len(v) > 1 else f"grok-{v}"])
-        
+
         # Add thinking suffix variants
         if "thinking" in id_lower:
             aliases.extend([f"{a}-thinking" for a in aliases])
-        
+
         return aliases
-    
+
     def _use_defaults(self) -> None:
         """Use default models as fallback."""
         self._models = []
@@ -242,7 +237,7 @@ class ModelRegistry:
             {"id": "perplexity-sonar", "name": "Perplexity Sonar", "owned_by": "perplexity"},
             {"id": "perplexity-research", "name": "Perplexity Research", "owned_by": "perplexity"},
         ]
-    
+
     def get(self, name: str) -> Model:
         """Get a Model by name or alias."""
         key = name.lower().strip()
@@ -250,11 +245,11 @@ class ModelRegistry:
             return self._mapping[key]
         logging.warning(f"Unknown model '{name}', using default")
         return Models.BEST
-    
+
     def list_available(self) -> list[dict[str, str]]:
         """Get list of available models."""
         return self._available
-    
+
     def needs_refresh(self) -> bool:
         """Check if models need refreshing."""
         if not self._last_fetch:
@@ -279,18 +274,18 @@ class ConversationSession:
 
 class ConversationManager:
     """Manages persistent conversations with automatic cleanup."""
-    
+
     def __init__(self, client: Perplexity, timeout: int, max_per_user: int):
         self._client = client
         self._timeout = timeout
         self._max_per_user = max_per_user
-        self._sessions: Dict[str, ConversationSession] = {}
+        self._sessions: dict[str, ConversationSession] = {}
         self._cleanup_task: asyncio.Task | None = None
-    
+
     def start_cleanup(self) -> None:
         """Start background cleanup task."""
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
-    
+
     async def stop_cleanup(self) -> None:
         """Stop background cleanup task."""
         if self._cleanup_task:
@@ -299,7 +294,7 @@ class ConversationManager:
                 await self._cleanup_task
             except asyncio.CancelledError:
                 pass
-    
+
     async def _cleanup_loop(self) -> None:
         """Periodically clean up expired sessions."""
         while True:
@@ -313,7 +308,7 @@ class ConversationManager:
                 del self._sessions[cid]
             if expired:
                 logging.info(f"Cleaned up {len(expired)} expired conversations")
-    
+
     def get_or_create(
         self,
         conversation_id: str | None,
@@ -328,7 +323,7 @@ class ConversationManager:
             session.last_used = datetime.now()
             session.message_count += 1
             return conversation_id, session
-        
+
         # Enforce per-user limit
         if user_id:
             user_sessions = [s for s in self._sessions.values() if s.user_id == user_id]
@@ -338,12 +333,12 @@ class ConversationManager:
                     if sess is oldest:
                         del self._sessions[cid]
                         break
-        
+
         # Create new
         config = ConversationConfig(citation_mode=citation_mode)
         conversation = self._client.create_conversation(config)
         new_id = conversation_id or str(uuid.uuid4())
-        
+
         session = ConversationSession(
             conversation=conversation,
             created_at=datetime.now(),
@@ -353,7 +348,7 @@ class ConversationManager:
         )
         self._sessions[new_id] = session
         return new_id, session
-    
+
     def list_sessions(self, user_id: str | None) -> list[dict]:
         """List sessions, optionally filtered by user."""
         result = []
@@ -367,7 +362,7 @@ class ConversationManager:
                     "model": sess.model,
                 })
         return sorted(result, key=lambda x: x["last_used"], reverse=True)
-    
+
     def delete(self, conversation_id: str, user_id: str | None) -> bool:
         """Delete a conversation session."""
         if conversation_id not in self._sessions:
@@ -377,7 +372,7 @@ class ConversationManager:
             return False
         del self._sessions[conversation_id]
         return True
-    
+
     def get_stats(self) -> dict:
         """Get conversation statistics."""
         return {
@@ -385,7 +380,7 @@ class ConversationManager:
             "users": len(set(s.user_id for s in self._sessions.values() if s.user_id)),
             "messages": sum(s.message_count for s in self._sessions.values()),
         }
-    
+
     def close(self) -> None:
         """Close the Perplexity client."""
         self._client.close()
@@ -400,7 +395,7 @@ class ContentPart(BaseModel):
     type: str
     text: str | None = None
     image_url: dict[str, str] | None = None
-    
+
     model_config = ConfigDict(extra="allow")
 
 
@@ -408,21 +403,21 @@ class ChatMessage(BaseModel):
     role: str
     content: str | list[dict[str, Any]]
     name: str | None = None
-    
+
     model_config = ConfigDict(extra="allow")
-    
+
     def get_text_content(self) -> str:
         """Extract text content, handling both string and array formats."""
         if isinstance(self.content, str):
             return self.content
-        
+
         # Handle array format - extract text from content parts
         text_parts = []
         for part in self.content:
             if isinstance(part, dict):
                 if part.get("type") == "text" and "text" in part:
                     text_parts.append(part["text"])
-        
+
         return "\n".join(text_parts) if text_parts else ""
 
 
@@ -430,7 +425,7 @@ class ChatRequest(BaseModel):
     model: str = "perplexity-auto"
     messages: list[ChatMessage]
     stream: bool = False
-    
+
     # Standard OpenAI parameters (not all may be supported by Perplexity)
     temperature: float | None = None
     top_p: float | None = None
@@ -441,7 +436,7 @@ class ChatRequest(BaseModel):
     logit_bias: dict[str, float] | None = None
     user: str | None = None
     stop: str | list[str] | None = None
-    
+
     # Additional OpenAI parameters
     seed: int | None = None
     logprobs: bool | None = None
@@ -450,11 +445,11 @@ class ChatRequest(BaseModel):
     tools: list[dict[str, Any]] | None = None
     tool_choice: str | dict[str, Any] | None = None
     parallel_tool_calls: bool | None = None
-    
+
     # Perplexity-specific parameters
     conversation_id: str | None = None
     citation_mode: str | None = None
-    
+
     model_config = ConfigDict(extra="allow")  # Allow additional fields
 
 
@@ -555,31 +550,31 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     global models, manager, start_time
-    
+
     start_time = datetime.now()
-    
+
     # Initialize model registry and fetch models
     models = ModelRegistry()
     models.fetch(config.session_token)
-    
+
     # Initialize conversation manager
     client = Perplexity(session_token=config.session_token)
     manager = ConversationManager(client, config.conversation_timeout, config.max_conversations_per_user)
     manager.start_cleanup()
-    
+
     # Setup rate limiting
     if config.enable_rate_limiting:
         limiter = Limiter(key_func=get_remote_address, default_limits=[f"{config.requests_per_minute}/minute"])
         app.state.limiter = limiter
-        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    
+        app.add_exception_handler(RateLimitExceeded, cast("Any", _rate_limit_exceeded_handler))
+
     logging.info(f"🚀 Server starting on http://{config.host}:{config.port}")
     logging.info(f"   Models loaded: {len(models._models)}")
     logging.info(f"   Rate limiting: {'Enabled' if config.enable_rate_limiting else 'Disabled'}")
     logging.info(f"   Auth required: {'Yes' if config.api_key else 'No'}")
-    
+
     yield
-    
+
     await manager.stop_cleanup()
     manager.close()
 
@@ -610,11 +605,11 @@ def verify_auth(request: Request) -> str | None:
     """Verify API key and return user ID."""
     if not config.api_key:
         return None
-    
+
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer ") and auth[7:] == config.api_key:
         return hashlib.sha256(auth[7:].encode()).hexdigest()[:16]
-    
+
     raise HTTPException(status_code=401, detail="Invalid API key")
 
 
@@ -647,10 +642,10 @@ def messages_to_query(messages: list[ChatMessage]) -> str:
     """Convert messages to query string."""
     user_msgs = [m for m in messages if m.role == "user"]
     sys_msgs = [m for m in messages if m.role == "system"]
-    
+
     if len(user_msgs) == 1 and not sys_msgs:
         return user_msgs[0].get_text_content()
-    
+
     parts = []
     for msg in messages:
         if msg.role == "system":
@@ -716,10 +711,10 @@ async def stats(request: Request):
 async def list_models(request: Request):
     """List available models."""
     get_user(request)
-    
+
     if models.needs_refresh():
         models.fetch(config.session_token)
-    
+
     now = int(time.time())
     return ModelsResponse(
         data=[ModelItem(id=m["id"], created=now, owned_by=m["owned_by"]) for m in models.list_available()]
@@ -730,11 +725,11 @@ async def list_models(request: Request):
 async def get_model(model_id: str, request: Request):
     """Get model info."""
     get_user(request)
-    
+
     for m in models.list_available():
         if m["id"] == model_id:
             return ModelItem(id=m["id"], created=int(time.time()), owned_by=m["owned_by"])
-    
+
     raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found")
 
 
@@ -771,7 +766,7 @@ class CompletionRequest(BaseModel):
     echo: bool = False
     best_of: int | None = None
     logprobs: int | None = None
-    
+
     model_config = ConfigDict(extra="allow")
 
 
@@ -799,12 +794,12 @@ async def completions(request: Request, body: CompletionRequest):
     """Legacy completions endpoint for inline/code completions."""
     global request_count
     request_count += 1
-    
+
     user_id = get_user(request)
-    
+
     # Handle prompt as string or list
     prompt = body.prompt if isinstance(body.prompt, str) else "\n".join(body.prompt)
-    
+
     if not prompt:
         raise HTTPException(
             status_code=400,
@@ -817,7 +812,7 @@ async def completions(request: Request, body: CompletionRequest):
                 }
             }
         )
-    
+
     # Validate n parameter
     if body.n and body.n > 1:
         raise HTTPException(
@@ -831,26 +826,26 @@ async def completions(request: Request, body: CompletionRequest):
                 }
             }
         )
-    
+
     model_obj = models.get(body.model)
     citation_mode = CitationMode.CLEAN  # No citations for code completions
-    
+
     conv_id, session = manager.get_or_create(
         None, user_id, body.model, citation_mode
     )
-    
+
     response_id = f"cmpl-{uuid.uuid4().hex[:24]}"
     created = int(time.time())
-    
+
     try:
         # Run completion
         await asyncio.to_thread(session.conversation.ask, prompt, model=model_obj, stream=False)
         answer = session.conversation.answer or ""
-        
+
         # Add suffix if provided
         if body.suffix:
             answer = answer + body.suffix
-        
+
         return CompletionResponse(
             id=response_id,
             created=created,
@@ -912,12 +907,12 @@ async def chat_completions(request: Request, body: ChatRequest):
     """Chat completions endpoint."""
     global request_count
     request_count += 1
-    
+
     user_id = get_user(request)
-    
+
     if not body.messages:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail={
                 "error": {
                     "message": "messages is required",
@@ -927,7 +922,7 @@ async def chat_completions(request: Request, body: ChatRequest):
                 }
             }
         )
-    
+
     # Validate n parameter (number of completions)
     if body.n and body.n > 1:
         raise HTTPException(
@@ -941,18 +936,18 @@ async def chat_completions(request: Request, body: ChatRequest):
                 }
             }
         )
-    
+
     model_obj = models.get(body.model)
     citation_mode = parse_citation_mode(body.citation_mode)
-    
+
     conv_id, session = manager.get_or_create(
         body.conversation_id, user_id, body.model, citation_mode
     )
-    
+
     query = messages_to_query(body.messages)
     response_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
     created = int(time.time())
-    
+
     try:
         if body.stream:
             return StreamingResponse(
@@ -964,7 +959,7 @@ async def chat_completions(request: Request, body: ChatRequest):
             # The scraper client is synchronous and may block. Run in a worker thread.
             await asyncio.to_thread(session.conversation.ask, query, model=model_obj, stream=False)
             answer = session.conversation.answer or ""
-            
+
             return ChatResponse(
                 id=response_id,
                 created=created,
@@ -1036,7 +1031,7 @@ async def stream_response(
             break
         else:
             break
-    
+
     # Final chunk
     yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={}, finish_reason='stop')], system_fingerprint='perplexity_v1').model_dump_json()}\n\n"
     yield "data: [DONE]\n\n"

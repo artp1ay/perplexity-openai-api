@@ -8,13 +8,12 @@ This script scrapes the actual available models instead of using a hardcoded lis
 
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass
 import json
-import os
 import re
 import sys
-from dataclasses import dataclass, asdict
-from typing import Any, Optional
-from datetime import datetime
+from typing import Any
+
 
 try:
     from curl_cffi.requests import Session
@@ -47,14 +46,14 @@ class ModelInfo:
     provider: str = "unknown"
     is_pro: bool = False
     supports_reasoning: bool = False
-    
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 class PerplexityModelsFetcher:
     """Fetches available models from Perplexity's web interface."""
-    
+
     def __init__(self, session_token: str):
         """Initialize the fetcher with a session token.
         
@@ -62,9 +61,9 @@ class PerplexityModelsFetcher:
             session_token: Perplexity session cookie value
         """
         self.session_token = session_token
-        self._session: Optional[Session] = None
+        self._session: Session | None = None
         self._models: list[ModelInfo] = []
-        
+
     def _get_session(self) -> Session:
         """Get or create HTTP session."""
         if self._session is None:
@@ -79,23 +78,23 @@ class PerplexityModelsFetcher:
                 impersonate="chrome",
             )
         return self._session
-    
+
     def _extract_models_from_html(self, html: str) -> list[ModelInfo]:
         """Extract model information from the page HTML/JS."""
         models: list[ModelInfo] = []
-        
+
         # Pattern to find model configurations in the JavaScript
         # Perplexity typically embeds model info in __NEXT_DATA__ or similar
         next_data_pattern = r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>'
         next_data_match = re.search(next_data_pattern, html, re.DOTALL)
-        
+
         if next_data_match:
             try:
                 data = json.loads(next_data_match.group(1))
                 models.extend(self._parse_next_data(data))
             except json.JSONDecodeError:
                 pass
-        
+
         # Also look for model identifiers in other script tags
         # Common patterns for model IDs in Perplexity
         model_patterns = [
@@ -104,31 +103,31 @@ class PerplexityModelsFetcher:
             r'"model"\s*:\s*"([a-z0-9_]+)"',
             r'modelId["\']?\s*[:=]\s*["\']([a-z0-9_]+)["\']',
         ]
-        
+
         found_ids = set()
         for pattern in model_patterns:
             for match in re.finditer(pattern, html, re.IGNORECASE):
                 model_id = match.group(1)
                 if self._is_valid_model_id(model_id):
                     found_ids.add(model_id)
-        
+
         # Add any newly found models
         existing_ids = {m.identifier for m in models}
         for model_id in found_ids:
             if model_id not in existing_ids:
                 models.append(self._create_model_info(model_id))
-        
+
         return models
-    
+
     def _parse_next_data(self, data: dict) -> list[ModelInfo]:
         """Parse __NEXT_DATA__ JSON for model information."""
         models: list[ModelInfo] = []
-        
+
         # Recursively search for model configurations
         def search_dict(d: dict, depth: int = 0) -> None:
             if depth > 10:  # Prevent infinite recursion
                 return
-                
+
             for key, value in d.items():
                 if isinstance(value, dict):
                     # Check if this looks like a model definition
@@ -149,15 +148,15 @@ class PerplexityModelsFetcher:
                     for item in value:
                         if isinstance(item, dict):
                             search_dict(item, depth + 1)
-        
+
         search_dict(data)
         return models
-    
+
     def _is_valid_model_id(self, model_id: str) -> bool:
         """Check if a string looks like a valid model identifier."""
         if not model_id or len(model_id) < 3:
             return False
-        
+
         # Known model ID patterns
         valid_patterns = [
             r'^pplx_',
@@ -172,7 +171,7 @@ class PerplexityModelsFetcher:
             r'^mistral',
             r'^deepseek',
         ]
-        
+
         # Exclude common false positives
         exclude_patterns = [
             r'^api_',
@@ -182,22 +181,22 @@ class PerplexityModelsFetcher:
             r'^auth',
             r'^config',
         ]
-        
+
         for pattern in exclude_patterns:
             if re.match(pattern, model_id, re.IGNORECASE):
                 return False
-        
+
         for pattern in valid_patterns:
             if re.match(pattern, model_id, re.IGNORECASE):
                 return True
-        
+
         return False
-    
+
     def _create_model_info(self, model_id: str) -> ModelInfo:
         """Create ModelInfo from a model identifier."""
         name = self._infer_model_name(model_id)
         provider = self._infer_provider(model_id)
-        
+
         return ModelInfo(
             identifier=model_id,
             name=name,
@@ -207,7 +206,7 @@ class PerplexityModelsFetcher:
             is_pro="pro" in model_id.lower() or "alpha" in model_id.lower(),
             supports_reasoning="thinking" in model_id.lower() or "reasoning" in model_id.lower(),
         )
-    
+
     def _infer_model_name(self, model_id: str) -> str:
         """Infer a human-readable name from model ID."""
         name_mappings = {
@@ -225,13 +224,13 @@ class PerplexityModelsFetcher:
             "grok41nonreasoning": "Grok 4.1",
             "kimik2thinking": "Kimi K2 Thinking",
         }
-        
+
         return name_mappings.get(model_id, model_id.replace("_", " ").title())
-    
+
     def _infer_provider(self, model_id: str) -> str:
         """Infer the model provider from model ID."""
         model_id_lower = model_id.lower()
-        
+
         if model_id_lower.startswith("pplx") or model_id_lower == "experimental":
             return "Perplexity"
         elif model_id_lower.startswith("gpt"):
@@ -252,7 +251,7 @@ class PerplexityModelsFetcher:
             return "DeepSeek"
         else:
             return "Unknown"
-    
+
     def fetch_models(self) -> list[ModelInfo]:
         """Fetch available models from Perplexity.
         
@@ -260,42 +259,42 @@ class PerplexityModelsFetcher:
             List of available models
         """
         session = self._get_session()
-        
+
         # Fetch the main page to get model information
         try:
             response = session.get(API_BASE_URL)
             response.raise_for_status()
-            
+
             models = self._extract_models_from_html(response.text)
-            
+
             # If we didn't find models from HTML, try the settings/API endpoint
             if not models:
                 models = self._fetch_from_settings()
-            
+
             # If still no models, use known defaults
             if not models:
                 models = self._get_default_models()
-            
+
             self._models = models
             return models
-            
+
         except Exception as e:
             print(f"Error fetching models: {e}", file=sys.stderr)
             # Return default models on error
             self._models = self._get_default_models()
             return self._models
-    
+
     def _fetch_from_settings(self) -> list[ModelInfo]:
         """Try to fetch models from settings or API endpoints."""
         session = self._get_session()
         models: list[ModelInfo] = []
-        
+
         # Try various endpoints that might contain model info
         endpoints = [
             "/api/auth/session",
             "/api/user/settings",
         ]
-        
+
         for endpoint in endpoints:
             try:
                 response = session.get(f"{API_BASE_URL}{endpoint}")
@@ -320,9 +319,9 @@ class PerplexityModelsFetcher:
                                             ))
             except Exception:
                 continue
-        
+
         return models
-    
+
     def _get_default_models(self) -> list[ModelInfo]:
         """Return known default models as fallback."""
         return [
@@ -340,26 +339,26 @@ class PerplexityModelsFetcher:
             ModelInfo("grok41nonreasoning", "Grok 4.1", "xAI's Grok 4.1", "copilot", "xAI", True),
             ModelInfo("kimik2thinking", "Kimi K2 Thinking", "Moonshot AI's Kimi K2", "copilot", "Moonshot AI", True, True),
         ]
-    
-    def get_model_by_id(self, model_id: str) -> Optional[ModelInfo]:
+
+    def get_model_by_id(self, model_id: str) -> ModelInfo | None:
         """Get a model by its identifier."""
         if not self._models:
             self.fetch_models()
-        
+
         for model in self._models:
             if model.identifier == model_id:
                 return model
         return None
-    
+
     def close(self) -> None:
         """Close the HTTP session."""
         if self._session:
             self._session.close()
             self._session = None
-    
-    def __enter__(self) -> "PerplexityModelsFetcher":
+
+    def __enter__(self) -> PerplexityModelsFetcher:
         return self
-    
+
     def __exit__(self, *args) -> None:
         self.close()
 

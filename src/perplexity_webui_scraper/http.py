@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from time import monotonic
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urljoin
 
 from curl_cffi.requests import Response as CurlResponse
@@ -92,7 +92,7 @@ class HTTPClient:
             headers=headers,
             cookies=cookies,
             timeout=self._timeout,
-            impersonate=impersonate,
+            impersonate=cast("Any", impersonate),
         )
 
     def _rotate_session(self) -> None:

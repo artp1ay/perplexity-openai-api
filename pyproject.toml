@@ -102,6 +102,36 @@ lines-after-imports = 2             # PEP 8: two blank lines after imports
 force-sort-within-sections = true   # Alphabetical order within each section
 split-on-trailing-comma = true      # Trailing comma triggers multi-line format
 
+[tool.ruff.lint.per-file-ignores]
+"openai_server.py" = [
+    "B904",
+    "C401",
+    "E501",
+    "PLC0415",
+    "PLR0911",
+    "PLR0915",
+    "PLW0603",
+    "PTH118",
+    "PTH120",
+    "RUF059",
+    "SIM102",
+    "SIM105",
+    "T201",
+    "TC003",
+]
+"src/perplexity_webui_scraper/fetch_models.py" = [
+    "B007",
+    "E501",
+    "PERF102",
+    "PERF203",
+    "PERF401",
+    "PLC0415",
+    "PLR0911",
+    "SIM110",
+    "T201",
+    "W293",
+]
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"   # Google-style docstrings (Args, Returns, Raises)
 
