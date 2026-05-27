@@ -194,6 +194,17 @@ class Models:
         tool_name="pplx_kimi_k25_think",
     )
 
+    LABS: ClassVar[Model] = Model(
+        identifier="pplx_beta",
+        name="Labs",
+        description="Create projects from scratch",
+        mode="copilot",
+        subscription_tier="pro",
+        tool_name="pplx_labs",
+    )
+
+    RESEARCH: ClassVar[Model] = DEEP_RESEARCH
+
     @classmethod
     def all(cls) -> list[Model]:
         """Return bundled fallback models."""

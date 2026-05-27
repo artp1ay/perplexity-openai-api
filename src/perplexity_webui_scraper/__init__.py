@@ -18,6 +18,7 @@ from .exceptions import (
 )
 from .models import Model, Models
 from .types import Coordinates, Response, SearchResultItem
+from .fetch_models import ModelInfo, PerplexityModelsFetcher, get_available_models
 
 
 ConversationConfig.model_rebuild()
@@ -33,12 +34,15 @@ __all__: list[str] = [
     "Coordinates",
     "FileUploadError",
     "FileValidationError",
+    "get_available_models",
     "HTTPError",
     "LogLevel",
     "Model",
+    "ModelInfo",
     "Models",
     "Perplexity",
     "PerplexityError",
+    "PerplexityModelsFetcher",
     "RateLimitError",
     "ResearchClarifyingQuestionsError",
     "Response",

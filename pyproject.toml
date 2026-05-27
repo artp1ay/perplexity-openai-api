@@ -1,14 +1,14 @@
 [project]
 name = "perplexity-webui-scraper"
-version = "0.5.1"
-description = "Python scraper to extract AI responses from Perplexity's web interface."
-authors = [{ name = "henrique-coder", email = "henriquemoreira10fk@gmail.com" }]
+version = "1.0.0"
+description = "Production-ready OpenAI-compatible API proxy for Perplexity."
+authors = [{ name = "Max", email = "opensource@example.com" }]
 license = "MIT"
 readme = "README.md"
-requires-python = ">=3.10,<3.15"
-keywords = ["perplexity", "ai", "scraper", "webui", "api", "client"]
+requires-python = ">=3.10"
+keywords = ["perplexity", "openai", "proxy", "fastapi", "api", "llm"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
@@ -24,15 +24,21 @@ classifiers = [
 ]
 dependencies = [
     "curl-cffi>=0.14.0",
+    "fastapi>=0.124.4",
     "loguru>=0.7.3",
     "orjson>=3.11.7",
     "pydantic>=2.12.5",
+    "python-dotenv>=1.2.1",
+    "slowapi>=0.1.9",
     "tenacity>=9.1.4",
+    "uvicorn>=0.38.0",
 ]
 
 [dependency-groups]
 dev = [
+    "black>=25.12.0",
     "beautifulsoup4>=4.14.3",
+    "httpx>=0.28.1",
     "jsbeautifier>=1.15.4",
     "lxml>=6.0.2",
     "prek>=0.3.4",
@@ -53,11 +59,11 @@ mcp = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/henrique-coder/perplexity-webui-scraper"
-Documentation = "https://github.com/henrique-coder/perplexity-webui-scraper#readme"
-Repository = "https://github.com/henrique-coder/perplexity-webui-scraper.git"
-Issues = "https://github.com/henrique-coder/perplexity-webui-scraper/issues"
-Changelog = "https://github.com/henrique-coder/perplexity-webui-scraper/releases"
+Homepage = "https://github.com/max/perplexity-webui-scraper"
+Documentation = "https://github.com/max/perplexity-webui-scraper#readme"
+Repository = "https://github.com/max/perplexity-webui-scraper.git"
+Issues = "https://github.com/max/perplexity-webui-scraper/issues"
+Changelog = "https://github.com/max/perplexity-webui-scraper/releases"
 
 [tool.ruff]
 line-length = 120

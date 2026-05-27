@@ -1,284 +1,120 @@
-<div align="center">
+# Perplexity OpenAI-Compatible API Server
 
-# Perplexity WebUI Scraper
+Transform Perplexity AI into a drop-in replacement for OpenAI's API. This server bridges the gap between Perplexity's powerful search-augmented intelligence and applications built for OpenAI's standard interface. Deploy in seconds with Docker, no code changes required. 
+It is forked from [henrique-coder/perplexity-webui-scraper](https://github.com/henrique-coder/perplexity-webui-scraper) and uses Python and FastAPI to create a RESTful API server.
 
-Python scraper to extract AI responses from [Perplexity's](https://www.perplexity.ai) web interface.
 
-[![PyPI](https://img.shields.io/pypi/v/perplexity-webui-scraper?color=blue)](https://pypi.org/project/perplexity-webui-scraper)
-[![Python](https://img.shields.io/pypi/pyversions/perplexity-webui-scraper)](https://pypi.org/project/perplexity-webui-scraper)
-[![License](https://img.shields.io/github/license/henrique-coder/perplexity-webui-scraper?color=green)](./LICENSE)
+### Features
 
-</div>
-
----
-
-## Installation
-
-### As a Library
-
-```bash
-# From PyPI (stable)
-uv add perplexity-webui-scraper
-
-# From GitHub prod branch (latest fixes)
-uv add git+https://github.com/henrique-coder/perplexity-webui-scraper.git@prod
-```
-
-### As MCP Server
-
-No installation required - `uvx` handles everything automatically:
-
-```bash
-# From PyPI (stable)
-uvx --from perplexity-webui-scraper[mcp]@latest perplexity-webui-scraper-mcp
-
-# From GitHub prod branch (latest fixes)
-uvx --from "perplexity-webui-scraper[mcp]@git+https://github.com/henrique-coder/perplexity-webui-scraper.git@prod" perplexity-webui-scraper-mcp
-
-# From local directory (for development)
-uv --directory /path/to/perplexity-webui-scraper run perplexity-webui-scraper-mcp
-```
-
-## Requirements
-
-- **Perplexity Pro/Max account**
-- **Session token** (`__Secure-next-auth.session-token` cookie)
-
-### Getting Your Session Token
-
-#### Option 1: Automatic (CLI Tool)
-
-```bash
-uv run get-perplexity-session-token
-```
-
-This interactive tool will:
-
-1. Ask for your Perplexity email
-2. Send a verification code to your email
-3. Accept either a 6-digit code or magic link
-4. Extract and display your session token
-5. Optionally save it to your `.env` file
-
-#### Option 2: Manual (Browser)
-
-1. Log in at [perplexity.ai](https://www.perplexity.ai)
-2. Open DevTools (`F12`) → Application/Storage → Cookies
-3. Copy the value of `__Secure-next-auth.session-token`
-4. Store in `.env`: `PERPLEXITY_SESSION_TOKEN="your_token"`
+- Models are automatically discovered from Perplexity.
+- One-click deployment with Docker
+- Request rate limiting 
 
 ## Quick Start
 
-```python
-from perplexity_webui_scraper import Perplexity
+### Docker (Recommended)
 
-client = Perplexity(session_token="YOUR_TOKEN")
-conversation = client.create_conversation()
+```bash
+# 1. Copy environment template
+cp .env.example .env
 
-conversation.ask("What is quantum computing?")
-print(conversation.answer)
+# 2. Add your Perplexity session token to .env
 
-# Follow-up (context is preserved)
-conversation.ask("Explain it simpler")
-print(conversation.answer)
+# 3. Start the server
+docker-compose up -d
+
+# 4. Test
+curl http://localhost:8000/health
+curl http://localhost:8000/v1/models
 ```
 
-### Streaming
+### Manual
 
-```python
-for chunk in conversation.ask("Explain AI", stream=True):
-    print(chunk.answer)
+```bash
+# Install dependencies
+pip install -r requirements.txt
+pip install -e .
+
+# Copy and configure .env
+cp .env.example .env
+# Edit .env with your session token
+
+# Run
+python openai_server.py
 ```
 
-### With Options
+## Getting Your Session Token
+
+1. Log in at [perplexity.ai](https://www.perplexity.ai)
+2. Open DevTools (F12) → Application → Cookies
+3. Copy `__Secure-next-auth.session-token` value
+4. Add to `.env`: `PERPLEXITY_SESSION_TOKEN=your_token`
+
+## API Usage
+
+The server is 100% OpenAI API compatible:
 
 ```python
-from perplexity_webui_scraper import (
-    ConversationConfig,
-    Coordinates,
-    Models,
-    SourceFocus,
+import openai
+
+client = openai.OpenAI(
+    api_key="your-api-key",  # Optional
+    base_url="http://localhost:8000/v1"
 )
 
-config = ConversationConfig(
-    model="pplx_alpha",
-    source_focus=[SourceFocus.WEB, SourceFocus.ACADEMIC],
-    language="en-US",
-    coordinates=Coordinates(latitude=12.3456, longitude=-98.7654),
+response = client.chat.completions.create(
+    model="perplexity-auto",
+    messages=[{"role": "user", "content": "Hello!"}]
 )
 
-conversation = client.create_conversation(config)
-conversation.ask("Latest AI research", files=["paper.pdf"])
+print(response.choices[0].message.content)
 ```
 
-### Available Models
-
-```python
-models = client.available_models(refresh=True)
-for model in models:
-    print(model.identifier, model.name, model.mode)
-
-conversation.ask("Compare current AI search engines", model="default")
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "perplexity-auto", "messages": [{"role": "user", "content": "Hello!"}]}'
 ```
 
-Model metadata is discovered from Perplexity's live frontend assets and cached for one hour by default.
-The bundled `Models.*` constants remain as offline fallbacks, but runtime code can use any current model id
-returned by `client.available_models()`.
+## Endpoints
 
-## API Reference
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/chat/completions` | POST | Chat completions |
+| `/v1/models` | GET | List available models |
+| `/v1/models/refresh` | POST | Refresh models from Perplexity |
+| `/conversations` | GET | List conversations |
+| `/stats` | GET | Server statistics |
+| `/health` | GET | Health check |
 
-### `Perplexity(session_token, config?)`
+## Configuration
 
-| Parameter       | Type           | Description        |
-| --------------- | -------------- | ------------------ |
-| `session_token` | `str`          | Browser cookie     |
-| `config`        | `ClientConfig` | Timeout, TLS, etc. |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PERPLEXITY_SESSION_TOKEN` | - | Required: Session token |
+| `OPENAI_API_KEY` | - | Optional: API key for auth |
+| `PORT` | 8000 | Server port |
+| `LOG_LEVEL` | INFO | Logging level |
+| `ENABLE_RATE_LIMITING` | true | Enable rate limiting |
+| `REQUESTS_PER_MINUTE` | 60 | Rate limit |
+| `CONVERSATION_TIMEOUT` | 3600 | Session timeout (seconds) |
+| `DEFAULT_MODEL` | perplexity-auto | Default model |
 
-### `Perplexity.available_models(refresh?, cache_ttl?)`
+## Models
 
-Returns the currently advertised Perplexity models as `Model` objects. Set `refresh=True` to bypass the
-in-process cache.
+Models are automatically fetched from Perplexity. Common models include:
 
-### `Conversation.ask(query, model?, files?, citation_mode?, stream?)`
+- `perplexity-auto` - Auto-select best model
+- `perplexity-sonar` - Fast responses
+- `perplexity-research` - Deep research
+- GPT, Claude, Gemini, Grok models via Perplexity
 
-| Parameter       | Type                    | Default       | Description         |
-| --------------- | ----------------------- | ------------- | ------------------- |
-| `query`         | `str`                   | -             | Question (required) |
-| `model`         | `Model \| str`          | `Models.BEST` | AI model or model id |
-| `files`         | `list[str \| PathLike]` | `None`        | File paths          |
-| `citation_mode` | `CitationMode`          | `CLEAN`       | Citation format     |
-| `stream`        | `bool`                  | `False`       | Enable streaming    |
+Use `/v1/models` to see all available models.
 
-### Models
+## License
 
-Use `client.available_models()` for the current live list. `Models.all()` returns bundled fallback models
-for offline usage and backward compatibility.
-
-### CitationMode
-
-| Mode       | Output                |
-| ---------- | --------------------- |
-| `DEFAULT`  | `text[1]`             |
-| `MARKDOWN` | `text[1](url)`        |
-| `CLEAN`    | `text` (no citations) |
-
-### ConversationConfig
-
-| Parameter         | Default       | Description        |
-| ----------------- | ------------- | ------------------ |
-| `model`           | `Models.BEST` | Default model      |
-| `citation_mode`   | `CLEAN`       | Citation format    |
-| `save_to_library` | `False`       | Save to library    |
-| `search_focus`    | `WEB`         | Search type        |
-| `source_focus`    | `WEB`         | Source types       |
-| `time_range`      | `ALL`         | Time filter        |
-| `language`        | `"en-US"`     | Response language  |
-| `timezone`        | `None`        | Timezone           |
-| `coordinates`     | `None`        | Location (lat/lng) |
-
-## Exceptions
-
-| Exception                          | Description                                        |
-| ---------------------------------- | -------------------------------------------------- |
-| `PerplexityError`                  | Base exception for all library errors              |
-| `HTTPError`                        | HTTP error with status code and response body      |
-| `AuthenticationError`              | Session token is invalid or expired (HTTP 401/403) |
-| `RateLimitError`                   | Rate limit exceeded (HTTP 429)                     |
-| `FileUploadError`                  | File upload failed                                 |
-| `FileValidationError`              | File validation failed (size, type, etc.)          |
-| `ResearchClarifyingQuestionsError` | Research mode asking clarifying questions          |
-| `ResponseParsingError`             | API response could not be parsed                   |
-| `StreamingError`                   | Error during streaming response                    |
-
-## MCP Server (Model Context Protocol)
-
-The library includes an MCP server for AI assistants like Claude Desktop and Antigravity.
-
-The server exposes a universal `pplx_search` tool that accepts any live model id. Per-model tools are still
-registered as backward-compatible aliases.
-
-### Configuration
-
-Add to your MCP config file (no installation required):
-
-**Claude Desktop** (`~/.config/claude/claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "perplexity-webui-scraper": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "perplexity-webui-scraper[mcp]@latest",
-        "perplexity-webui-scraper-mcp"
-      ],
-      "env": {
-        "PERPLEXITY_SESSION_TOKEN": "your_token_here"
-      }
-    }
-  }
-}
-```
-
-**From GitHub dev branch:**
-
-```json
-{
-  "mcpServers": {
-    "perplexity-webui-scraper": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "perplexity-webui-scraper[mcp]@git+https://github.com/henrique-coder/perplexity-webui-scraper.git@prod",
-        "perplexity-webui-scraper-mcp"
-      ],
-      "env": {
-        "PERPLEXITY_SESSION_TOKEN": "your_token_here"
-      }
-    }
-  }
-}
-```
-
-**From local directory (for development):**
-
-```json
-{
-  "mcpServers": {
-    "perplexity-webui-scraper": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/perplexity-webui-scraper",
-        "run",
-        "perplexity-webui-scraper-mcp"
-      ],
-      "env": {
-        "PERPLEXITY_SESSION_TOKEN": "your_token_here"
-      }
-    }
-  }
-}
-```
-
-### Available Tools
-
-| Tool               | Description                                                              |
-| ------------------ | ------------------------------------------------------------------------ |
-| `pplx_list_models` | Returns current model ids from the live Perplexity frontend model list   |
-| `pplx_search`      | Searches with any model id returned by `pplx_list_models`                |
-| `pplx_ask`, etc.   | Backward-compatible aliases for bundled fallback models                  |
-
-`pplx_search` supports:
-
-- `model`: any current model id, model name, or bundled tool name
-- `source_focus`: `web`, `academic`, `social`, `finance`, `all`
-- `citation_mode`: `default`, `markdown`, `clean`
-- `files`: optional local file paths
+MIT
 
 ## Disclaimer
 
-This is an **unofficial** library. It uses internal APIs that may change without notice. Use at your own risk.
-
-By using this library, you agree to Perplexity AI's Terms of Service.
+This is an unofficial implementation using internal Perplexity APIs. Use at your own risk.

@@ -156,7 +156,12 @@ class HTTPClient:
         if self._rate_limiter:
             self._rate_limiter.acquire()
 
-    def get(self, endpoint: str, params: dict[str, Any] | None = None) -> CurlResponse:
+    def get(
+        self,
+        endpoint: str,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> CurlResponse:
         """Make a GET request with retry and rate limiting."""
 
         url = f"{API_BASE_URL}{endpoint}" if endpoint.startswith("/") else endpoint
@@ -170,7 +175,7 @@ class HTTPClient:
             request_start = monotonic()
 
             try:
-                response = self._session.get(url, params=params)
+                response = self._session.get(url, params=params, headers=headers)
                 elapsed_ms = (monotonic() - request_start) * 1000
                 log_response("GET", url, response.status_code, elapsed_ms=elapsed_ms)
 
@@ -239,7 +244,20 @@ class HTTPClient:
         if self._max_init_query_length and len(query) > self._max_init_query_length:
             query = query[: self._max_init_query_length]
 
-        self.get(ENDPOINT_SEARCH_INIT, params={"q": query})
+        init_headers = {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+
+        try:
+            self.get(ENDPOINT_SEARCH_INIT, params={"q": query}, headers=init_headers)
+            return
+        except PerplexityError as error:
+            logger.debug(f"init_search rejected with query parameter: {error}")
+
+        try:
+            self.get(ENDPOINT_SEARCH_INIT, headers=init_headers)
+        except PerplexityError as error:
+            logger.warning(f"init_search failed, continuing with SSE request: {error}")
 
     def stream_ask(self, payload: dict[str, Any]) -> Generator[bytes, None, None]:
         """Stream a prompt request to the ask endpoint."""
