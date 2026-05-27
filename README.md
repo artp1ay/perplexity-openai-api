@@ -79,16 +79,19 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 
 ### BoltAI Web Browsing / Web Fetch
 
-BoltAI's Web Browsing plugin works through Function Calling. This server detects web-fetch-like tools
-(`web_fetch`, Web Browsing, fetch URL, read webpage, etc.) and returns OpenAI-compatible `tool_calls`
-when the latest user message contains HTTP(S) URLs. BoltAI then fetches the pages locally and sends the
-tool result back; the server includes that result in the Perplexity prompt as full context.
+BoltAI's Web Browsing plugin works through Function Calling, but some OpenAI-compatible clients do not
+complete the tool-call round trip reliably. By default this server performs web fetch server-side: when the
+latest user message contains HTTP(S) URLs, it fetches the pages, extracts readable text, and adds that
+content to the Perplexity prompt. Existing BoltAI tool results are also accepted as context.
 
 Enable the Web Browsing plugin in BoltAI and ask for a specific page, for example:
 
 ```text
 Read https://example.com and summarize the page.
 ```
+
+Set `RETURN_TOOL_CALLS=true` only if you explicitly want the older OpenAI `tool_calls` round trip instead
+of server-side fetching.
 
 ## Endpoints
 
@@ -113,6 +116,11 @@ Read https://example.com and summarize the page.
 | `REQUESTS_PER_MINUTE` | 60 | Rate limit |
 | `CONVERSATION_TIMEOUT` | 3600 | Session timeout (seconds) |
 | `DEFAULT_MODEL` | perplexity-auto | Default model |
+| `ENABLE_SERVER_WEB_FETCH` | true | Fetch URLs server-side before calling Perplexity |
+| `RETURN_TOOL_CALLS` | false | Return OpenAI `tool_calls` instead of server-side fetch |
+| `WEB_FETCH_MAX_URLS` | 8 | Maximum URLs fetched per request |
+| `WEB_FETCH_MAX_CHARS_PER_URL` | 80000 | Maximum extracted characters per URL |
+| `WEB_FETCH_MAX_TOTAL_CHARS` | 240000 | Maximum total fetched context per request |
 
 ## Models
 

@@ -19,10 +19,10 @@ import time
 from typing import Any, cast
 import uuid
 
+from curl_cffi.requests import Session as CurlSession
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from curl_cffi.requests import Session as CurlSession
 from pydantic import BaseModel, ConfigDict
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
