@@ -39,8 +39,8 @@ from perplexity_webui_scraper import (
     PerplexityError
 )
 from perplexity_webui_scraper.models import Model
-from fetch_models import ModelInfo as FetchedModelInfo
-from fetch_models import PerplexityModelsFetcher
+from perplexity_webui_scraper.fetch_models import ModelInfo as FetchedModelInfo
+from perplexity_webui_scraper.fetch_models import PerplexityModelsFetcher
 
 
 # =============================================================================
