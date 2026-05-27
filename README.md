@@ -101,7 +101,7 @@ from perplexity_webui_scraper import (
 )
 
 config = ConversationConfig(
-    model=Models.DEEP_RESEARCH,
+    model="pplx_alpha",
     source_focus=[SourceFocus.WEB, SourceFocus.ACADEMIC],
     language="en-US",
     coordinates=Coordinates(latitude=12.3456, longitude=-98.7654),
@@ -110,6 +110,20 @@ config = ConversationConfig(
 conversation = client.create_conversation(config)
 conversation.ask("Latest AI research", files=["paper.pdf"])
 ```
+
+### Available Models
+
+```python
+models = client.available_models(refresh=True)
+for model in models:
+    print(model.identifier, model.name, model.mode)
+
+conversation.ask("Compare current AI search engines", model="default")
+```
+
+Model metadata is discovered from Perplexity's live frontend assets and cached for one hour by default.
+The bundled `Models.*` constants remain as offline fallbacks, but runtime code can use any current model id
+returned by `client.available_models()`.
 
 ## API Reference
 
@@ -120,36 +134,25 @@ conversation.ask("Latest AI research", files=["paper.pdf"])
 | `session_token` | `str`          | Browser cookie     |
 | `config`        | `ClientConfig` | Timeout, TLS, etc. |
 
+### `Perplexity.available_models(refresh?, cache_ttl?)`
+
+Returns the currently advertised Perplexity models as `Model` objects. Set `refresh=True` to bypass the
+in-process cache.
+
 ### `Conversation.ask(query, model?, files?, citation_mode?, stream?)`
 
 | Parameter       | Type                    | Default       | Description         |
 | --------------- | ----------------------- | ------------- | ------------------- |
 | `query`         | `str`                   | -             | Question (required) |
-| `model`         | `Model`                 | `Models.BEST` | AI model            |
+| `model`         | `Model \| str`          | `Models.BEST` | AI model or model id |
 | `files`         | `list[str \| PathLike]` | `None`        | File paths          |
 | `citation_mode` | `CitationMode`          | `CLEAN`       | Citation format     |
 | `stream`        | `bool`                  | `False`       | Enable streaming    |
 
 ### Models
 
-| Model                              | Description                                                               | Tier |
-| ---------------------------------- | ------------------------------------------------------------------------- | ---- |
-| `Models.BEST`                      | Pro - Automatically selects the most responsive model based on the query  | pro  |
-| `Models.DEEP_RESEARCH`             | Deep research - Fast and thorough for routine research                    | pro  |
-| `Models.SONAR`                     | Sonar - Perplexity's latest model                                         | pro  |
-| `Models.GEMINI_3_FLASH`            | Gemini 3 Flash - Google's fast model                                      | pro  |
-| `Models.GEMINI_3_FLASH_THINKING`   | Gemini 3 Flash Thinking - Google's fast model                             | pro  |
-| `Models.GEMINI_31_PRO`             | Gemini 3.1 Pro - Google's latest model                                    | pro  |
-| `Models.GEMINI_31_PRO_THINKING`    | Gemini 3.1 Pro Thinking - Google's latest model with thinking             | pro  |
-| `Models.GPT_52`                    | GPT-5.2 - OpenAI's latest model                                           | pro  |
-| `Models.GPT_52_THINKING`           | GPT-5.2 Thinking - OpenAI's latest model with thinking                    | pro  |
-| `Models.CLAUDE_46_SONNET`          | Claude Sonnet 4.6 - Anthropic's fast model                                | pro  |
-| `Models.CLAUDE_46_SONNET_THINKING` | Claude Sonnet 4.6 Thinking - Anthropic's newest reasoning model           | pro  |
-| `Models.CLAUDE_46_OPUS`            | Claude Opus 4.6 - Anthropic's most advanced model                         | max  |
-| `Models.CLAUDE_46_OPUS_THINKING`   | Claude Opus 4.6 Thinking - Anthropic's Opus reasoning model with thinking | max  |
-| `Models.GROK_41`                   | Grok 4.1 - xAI's latest model                                             | pro  |
-| `Models.GROK_41_THINKING`          | Grok 4.1 Thinking - xAI's latest model                                    | pro  |
-| `Models.KIMI_K25_THINKING`         | Kimi K2.5 - Moonshot AI's latest model                                    | pro  |
+Use `client.available_models()` for the current live list. `Models.all()` returns bundled fallback models
+for offline usage and backward compatibility.
 
 ### CitationMode
 
@@ -191,7 +194,8 @@ conversation.ask("Latest AI research", files=["paper.pdf"])
 
 The library includes an MCP server for AI assistants like Claude Desktop and Antigravity.
 
-Each AI model is exposed as a separate tool - enable only the ones you need to reduce agent context size.
+The server exposes a universal `pplx_search` tool that accepts any live model id. Per-model tools are still
+registered as backward-compatible aliases.
 
 ### Configuration
 
@@ -260,28 +264,18 @@ Add to your MCP config file (no installation required):
 
 ### Available Tools
 
-Each tool uses a specific AI model. Enable only the ones you need:
+| Tool               | Description                                                              |
+| ------------------ | ------------------------------------------------------------------------ |
+| `pplx_list_models` | Returns current model ids from the live Perplexity frontend model list   |
+| `pplx_search`      | Searches with any model id returned by `pplx_list_models`                |
+| `pplx_ask`, etc.   | Backward-compatible aliases for bundled fallback models                  |
 
-| Tool                      | Model                      | Description                                                        | Tier |
-| ------------------------- | -------------------------- | ------------------------------------------------------------------ | ---- |
-| `pplx_ask`                | Pro                        | Automatically selects the most responsive model based on the query | pro  |
-| `pplx_deep_research`      | Deep research              | Fast and thorough for routine research                             | pro  |
-| `pplx_sonar`              | Sonar                      | Perplexity's latest model                                          | pro  |
-| `pplx_gemini_flash`       | Gemini 3 Flash             | Google's fast model                                                | pro  |
-| `pplx_gemini_flash_think` | Gemini 3 Flash Thinking    | Google's fast model                                                | pro  |
-| `pplx_gemini31_pro`       | Gemini 3.1 Pro             | Google's latest model                                              | pro  |
-| `pplx_gemini31_pro_think` | Gemini 3.1 Pro Thinking    | Google's latest model with thinking                                | pro  |
-| `pplx_gpt54`              | GPT-5.4                    | OpenAI's latest model                                              | pro  |
-| `pplx_gpt54_thinking`     | GPT-5.4 Thinking           | OpenAI's latest model with thinking                                | pro  |
-| `pplx_claude_s46`         | Claude Sonnet 4.6          | Anthropic's fast model                                             | pro  |
-| `pplx_claude_s46_think`   | Claude Sonnet 4.6 Thinking | Anthropic's newest reasoning model                                 | pro  |
-| `pplx_claude_o46`         | Claude Opus 4.6            | Anthropic's most advanced model                                    | max  |
-| `pplx_claude_o46_think`   | Claude Opus 4.6 Thinking   | Anthropic's Opus reasoning model with thinking                     | max  |
-| `pplx_grok41`             | Grok 4.1                   | xAI's latest model                                                 | pro  |
-| `pplx_grok41_think`       | Grok 4.1 Thinking          | xAI's latest model                                                 | pro  |
-| `pplx_kimi_k25_think`     | Kimi K2.5                  | Moonshot AI's latest model                                         | pro  |
+`pplx_search` supports:
 
-**All tools support `source_focus`:** `web`, `academic`, `social`, `finance`, `all`
+- `model`: any current model id, model name, or bundled tool name
+- `source_focus`: `web`, `academic`, `social`, `finance`, `all`
+- `citation_mode`: `default`, `markdown`, `clean`
+- `files`: optional local file paths
 
 ## Disclaimer
 

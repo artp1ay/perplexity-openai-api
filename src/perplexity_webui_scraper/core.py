@@ -14,7 +14,7 @@ from orjson import JSONDecodeError, loads
 
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Generator, Sequence
     from re import Match
 
 from .config import ClientConfig, ConversationConfig
@@ -72,6 +72,11 @@ class Perplexity:
         """Create a new conversation."""
 
         return Conversation(self._http, config or ConversationConfig())
+
+    def available_models(self, *, refresh: bool = False, cache_ttl: float = 3600) -> list[Model]:
+        """Return models currently advertised by Perplexity's frontend."""
+
+        return self._http.discover_models(refresh=refresh, cache_ttl=cache_ttl)
 
     def close(self) -> None:
         """Close the client."""
@@ -147,25 +152,32 @@ class Conversation:
     def ask(
         self,
         query: str,
-        model: Model | None = None,
-        files: list[str | PathLike] | None = None,
+        model: Model | str | None = None,
+        files: Sequence[str | PathLike] | None = None,
         citation_mode: CitationMode | None = None,
         stream: bool = False,
     ) -> Conversation:
         """Ask a question. Returns self for method chaining or streaming iteration."""
 
-        effective_model = model or self._config.model or Models.BEST
+        effective_model = self._resolve_model(model or self._config.model or Models.BEST)
         effective_citation = citation_mode if citation_mode is not None else self._config.citation_mode
         self._citation_mode = effective_citation
 
         self._execute(query, effective_model, files, stream=stream)
         return self
 
+    def _resolve_model(self, model: Model | str) -> Model:
+        if isinstance(model, Model):
+            return model
+
+        available_models = self._http.discover_models()
+        return Models.from_identifier(model, available_models=available_models)
+
     def _execute(
         self,
         query: str,
         model: Model,
-        files: list[str | PathLike] | None,
+        files: Sequence[str | PathLike] | None,
         stream: bool = False,
     ) -> None:
         """Execute a query."""
@@ -193,7 +205,7 @@ class Conversation:
         self._raw_data = {}
         self._stream_generator = None
 
-    def _validate_files(self, files: list[str | PathLike] | None) -> list[_FileInfo]:
+    def _validate_files(self, files: Sequence[str | PathLike] | None) -> list[_FileInfo]:
         if not files:
             return []
 

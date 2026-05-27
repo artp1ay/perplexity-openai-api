@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import suppress
 from time import monotonic
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urljoin
 
 from curl_cffi.requests import Response as CurlResponse
 from curl_cffi.requests import Session
@@ -13,6 +14,7 @@ from .constants import API_BASE_URL, DEFAULT_HEADERS, ENDPOINT_ASK, ENDPOINT_SEA
 from .exceptions import AuthenticationError, HTTPError, PerplexityError, RateLimitError
 from .limits import DEFAULT_TIMEOUT
 from .logging import get_logger, log_request, log_response, log_retry
+from .models import Model, Models, extract_models_from_text, extract_script_sources
 from .resilience import RateLimiter, RetryConfig, create_retry_decorator, get_random_browser_profile
 
 
@@ -31,6 +33,8 @@ class HTTPClient:
     __slots__ = (
         "_impersonate",
         "_max_init_query_length",
+        "_model_cache",
+        "_model_cache_time",
         "_rate_limiter",
         "_retry_config",
         "_rotate_fingerprint",
@@ -69,6 +73,8 @@ class HTTPClient:
         if requests_per_second > 0:
             self._rate_limiter = RateLimiter(requests_per_second=requests_per_second)
 
+        self._model_cache: list[Model] | None = None
+        self._model_cache_time = 0.0
         self._session = self._create_session(impersonate)
         logger.debug(f"HTTPClient initialized | impersonate={impersonate}")
 
@@ -239,6 +245,41 @@ class HTTPClient:
         """Stream a prompt request to the ask endpoint."""
 
         yield from self.stream_lines(ENDPOINT_ASK, json=payload)
+
+    def discover_models(self, *, refresh: bool = False, cache_ttl: float = 3600) -> list[Model]:
+        """Discover currently available models from Perplexity frontend assets."""
+
+        now = monotonic()
+        if (
+            not refresh
+            and self._model_cache is not None
+            and cache_ttl > 0
+            and now - self._model_cache_time < cache_ttl
+        ):
+            return list(self._model_cache)
+
+        discovered: list[Model] = []
+        try:
+            home = self.get("/").text
+            discovered.extend(extract_models_from_text(home, source="frontend-html"))
+
+            for src in extract_script_sources(home)[:80]:
+                try:
+                    script_url = urljoin(API_BASE_URL, src)
+                    script = self.get(script_url).text
+                except PerplexityError as error:
+                    logger.debug(f"Skipping model discovery asset {src}: {error}")
+                    continue
+
+                discovered.extend(extract_models_from_text(script, source="frontend-js"))
+
+        except PerplexityError as error:
+            logger.debug(f"Model discovery failed, using fallback models: {error}")
+
+        models = Models.merge_discovered(discovered) if discovered else Models.all()
+        self._model_cache = models
+        self._model_cache_time = now
+        return list(models)
 
     def close(self) -> None:
         """Close the HTTP session."""

@@ -20,7 +20,7 @@ class ConversationConfig(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    model: Model | None = None
+    model: Model | str | None = None
     citation_mode: CitationMode = CitationMode.CLEAN
     save_to_library: bool = False
     search_focus: SearchFocus = SearchFocus.WEB

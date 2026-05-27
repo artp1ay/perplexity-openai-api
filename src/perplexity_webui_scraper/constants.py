@@ -37,7 +37,7 @@ JSON_OBJECT_PATTERN: Final[Pattern[str]] = compile(r"^\{.*\}$")
 """Pattern to detect JSON object strings."""
 
 DEFAULT_HEADERS: Final[dict[str, str]] = {
-    "Accept": "text/event-stream, application/json",
+    "Accept": "text/event-stream, application/json, text/html;q=0.8, */*;q=0.5",
     "Content-Type": "application/json",
 }
 """Default HTTP headers for API requests."""
