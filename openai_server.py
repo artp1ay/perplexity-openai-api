@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 import hashlib
+from html.parser import HTMLParser
 import json
 import logging
 import os
@@ -21,6 +22,7 @@ import uuid
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from curl_cffi.requests import Session as CurlSession
 from pydantic import BaseModel, ConfigDict
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -41,6 +43,11 @@ from perplexity_webui_scraper.models import Model
 URL_PATTERN = re.compile(r"https?://[^\s<>\]\[)('\"`]+", re.IGNORECASE)
 WEB_FETCH_TOOL_KEYWORDS = ("web_fetch", "webfetch", "web_brows", "webbrows", "fetch_url", "fetchurl", "read_url")
 WEB_FETCH_NAME_KEYWORDS = ("web", "fetch", "browse", "browsing", "url", "page")
+WEB_FETCH_DEFAULT_TIMEOUT = 30
+WEB_FETCH_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+)
 
 
 # =============================================================================
@@ -68,6 +75,13 @@ class ServerConfig:
     # Defaults
     default_model: str = "perplexity-auto"
     default_citation_mode: CitationMode = CitationMode.CLEAN
+
+    # Web fetch
+    enable_server_web_fetch: bool = True
+    return_tool_calls: bool = False
+    web_fetch_max_urls: int = 8
+    web_fetch_max_chars_per_url: int = 80_000
+    web_fetch_max_total_chars: int = 240_000
 
     @classmethod
     def from_env(cls) -> ServerConfig:
@@ -100,6 +114,11 @@ class ServerConfig:
             max_conversations_per_user=int(os.getenv("MAX_CONVERSATIONS_PER_USER", "100")),
             default_model=os.getenv("DEFAULT_MODEL", "perplexity-auto"),
             default_citation_mode=CitationMode[os.getenv("DEFAULT_CITATION_MODE", "CLEAN").upper()],
+            enable_server_web_fetch=os.getenv("ENABLE_SERVER_WEB_FETCH", "true").lower() == "true",
+            return_tool_calls=os.getenv("RETURN_TOOL_CALLS", "false").lower() == "true",
+            web_fetch_max_urls=int(os.getenv("WEB_FETCH_MAX_URLS", "8")),
+            web_fetch_max_chars_per_url=int(os.getenv("WEB_FETCH_MAX_CHARS_PER_URL", "80000")),
+            web_fetch_max_total_chars=int(os.getenv("WEB_FETCH_MAX_TOTAL_CHARS", "240000")),
         )
 
 
@@ -402,6 +421,43 @@ class ContentPart(BaseModel):
     image_url: dict[str, str] | None = None
 
     model_config = ConfigDict(extra="allow")
+
+
+class HTMLTextExtractor(HTMLParser):
+    """Small HTML-to-text extractor for server-side web fetch."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._skip_depth = 0
+        self._parts: list[str] = []
+        self.title: str = ""
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style", "noscript", "svg", "canvas"}:
+            self._skip_depth += 1
+        elif tag in {"p", "div", "section", "article", "br", "li", "tr", "h1", "h2", "h3", "h4"}:
+            self._parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style", "noscript", "svg", "canvas"} and self._skip_depth:
+            self._skip_depth -= 1
+        elif tag in {"p", "div", "section", "article", "li", "tr", "h1", "h2", "h3", "h4"}:
+            self._parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_depth:
+            return
+
+        text = data.strip()
+        if text:
+            self._parts.append(text)
+            self._parts.append(" ")
+
+    def get_text(self) -> str:
+        text = "".join(self._parts)
+        text = re.sub(r"[ \t\r\f\v]+", " ", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
 
 
 class ChatMessage(BaseModel):
@@ -825,6 +881,92 @@ def build_web_fetch_tool_calls(body: ChatRequest) -> list[dict[str, Any]]:
     ]
 
 
+def should_server_fetch_urls(body: ChatRequest) -> bool:
+    """Return whether this request should be augmented by server-side web fetch."""
+    if not config.enable_server_web_fetch or has_recent_tool_result(body.messages):
+        return False
+
+    user_text = latest_user_text(body.messages)
+    if not extract_urls(user_text):
+        return False
+
+    return bool(body.tools is None or choose_web_fetch_tool(body) is not None)
+
+
+def extract_html_text(html: str) -> str:
+    """Extract readable text from HTML."""
+    parser = HTMLTextExtractor()
+    parser.feed(html)
+    return parser.get_text()
+
+
+def fetch_url_content(url: str) -> str:
+    """Fetch a URL and return text content suitable for model context."""
+    headers = {
+        "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
+        "User-Agent": WEB_FETCH_USER_AGENT,
+    }
+
+    with CurlSession(headers=headers, timeout=WEB_FETCH_DEFAULT_TIMEOUT, impersonate="chrome") as session:
+        response = session.get(url, allow_redirects=True)
+        response.raise_for_status()
+        content_type = response.headers.get("content-type", "").lower()
+        text = response.text
+
+    if "html" in content_type or "<html" in text[:1000].lower():
+        text = extract_html_text(text)
+    else:
+        text = re.sub(r"\s+", " ", text).strip()
+
+    return text[: config.web_fetch_max_chars_per_url]
+
+
+def build_web_fetch_context(body: ChatRequest) -> str:
+    """Fetch URLs from the latest user message and return prompt context."""
+    if not should_server_fetch_urls(body):
+        return ""
+
+    urls = extract_urls(latest_user_text(body.messages))[: config.web_fetch_max_urls]
+    if not urls:
+        return ""
+
+    blocks: list[str] = []
+    total_chars = 0
+    for url in urls:
+        if total_chars >= config.web_fetch_max_total_chars:
+            break
+
+        try:
+            content = fetch_url_content(url)
+        except Exception as error:
+            logging.warning(f"Web fetch failed for {url}: {error}")
+            content = f"[Fetch failed: {error}]"
+
+        remaining = config.web_fetch_max_total_chars - total_chars
+        content = content[:remaining]
+        total_chars += len(content)
+        blocks.append(f"URL: {url}\nCONTENT:\n{content}")
+
+    if not blocks:
+        return ""
+
+    return (
+        "[Server Web Fetch Results]\n"
+        "Use the fetched page content below as authoritative context for the user's request.\n\n"
+        + "\n\n---\n\n".join(blocks)
+    )
+
+
+async def prepare_query(body: ChatRequest) -> str:
+    """Build the final Perplexity query, including fetched web content when available."""
+    query = messages_to_query(body.messages)
+    web_context = await asyncio.to_thread(build_web_fetch_context, body)
+    if not web_context:
+        return query
+
+    return f"{query}\n\n{web_context}"
+
+
 def estimate_tokens(text: str) -> int:
     """Estimate token count."""
     return len(text) // 4
@@ -1106,12 +1248,13 @@ async def chat_completions(request: Request, body: ChatRequest):
         body.conversation_id, user_id, body.model, citation_mode
     )
 
-    query = messages_to_query(body.messages)
     response_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
     created = int(time.time())
-    tool_calls = build_web_fetch_tool_calls(body)
 
     try:
+        query = await prepare_query(body)
+        tool_calls = build_web_fetch_tool_calls(body) if config.return_tool_calls else []
+
         if tool_calls:
             if body.stream:
                 return StreamingResponse(
@@ -1329,7 +1472,8 @@ async def ws_chat(ws: WebSocket):
 
         response_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
         created = int(time.time())
-        tool_calls = build_web_fetch_tool_calls(body)
+        query = await prepare_query(body)
+        tool_calls = build_web_fetch_tool_calls(body) if config.return_tool_calls else []
 
         # Send conversation id so the client can reuse it
         await ws.send_text(json.dumps({"type": "meta", "conversation_id": conv_id, "response_id": response_id}))
@@ -1371,7 +1515,7 @@ async def ws_chat(ws: WebSocket):
                     created,
                     body.model,
                     model_obj,
-                    messages_to_query(body.messages),
+                    query,
                     session,
                 ):
                     if ws_stream_format == "json" and frame.startswith("data: "):
@@ -1383,7 +1527,6 @@ async def ws_chat(ws: WebSocket):
                     else:
                         await ws.send_text(frame)
             else:
-                query = messages_to_query(body.messages)
                 await asyncio.to_thread(session.conversation.ask, query, model=model_obj, stream=False)
                 answer = session.conversation.answer or ""
 
