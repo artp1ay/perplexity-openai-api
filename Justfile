@@ -8,6 +8,10 @@ lint:
 format:
     uv run ruff format
 
+test:
+    uv run pytest -v
+
+# Testing & Verification
 self-test:
     uv run --active python -c "import json; import openai_server; print(json.dumps(openai_server.run_self_test(), ensure_ascii=False, indent=2))"
 
@@ -21,50 +25,6 @@ verify-smoke:
 serve:
     uv run python openai_server.py
 
-health:
-    curl -s http://localhost:8000/health | python -m json.tool
-
-models:
-    curl -s http://localhost:8000/v1/models | python -m json.tool
-
-# Docker / Release
-docker-build:
-    docker compose build
-
-docker-up:
-    docker compose up -d
-
-docker-down:
-    docker compose down
-
-docker-logs:
-    docker compose logs -f perplexity-api
-
-docker-restart:
-    docker compose restart perplexity-api
-
-release-check: check self-test docker-build
-
-test:
-    uv run pytest -v
-
-# Docker
-build:
-    docker-compose build
-
-up:
-    docker-compose up -d
-
-down:
-    docker-compose down
-
-logs:
-    docker-compose logs -f
-
-restart:
-    docker-compose restart
-
-# Server
 run:
     python openai_server.py
 
@@ -73,6 +33,24 @@ health:
 
 models:
     curl -s http://localhost:8000/v1/models | python -m json.tool
+
+# Docker
+build:
+    docker compose build
+
+up:
+    docker compose up -d
+
+down:
+    docker compose down
+
+logs:
+    docker compose logs -f perplexity-api
+
+restart:
+    docker compose restart perplexity-api
+
+release-check: self-test build
 
 # Setup
 setup:
