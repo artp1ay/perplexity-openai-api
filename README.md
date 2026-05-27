@@ -9,6 +9,7 @@ It is forked from [henrique-coder/perplexity-webui-scraper](https://github.com/h
 - Models are automatically discovered from Perplexity.
 - One-click deployment with Docker
 - Request rate limiting 
+- OpenAI-compatible `tools` / `tool_calls` support for BoltAI Web Browsing / `web_fetch`
 
 ## Quick Start
 
@@ -74,6 +75,19 @@ print(response.choices[0].message.content)
 curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model": "perplexity-auto", "messages": [{"role": "user", "content": "Hello!"}]}'
+```
+
+### BoltAI Web Browsing / Web Fetch
+
+BoltAI's Web Browsing plugin works through Function Calling. This server detects web-fetch-like tools
+(`web_fetch`, Web Browsing, fetch URL, read webpage, etc.) and returns OpenAI-compatible `tool_calls`
+when the latest user message contains HTTP(S) URLs. BoltAI then fetches the pages locally and sends the
+tool result back; the server includes that result in the Perplexity prompt as full context.
+
+Enable the Web Browsing plugin in BoltAI and ask for a specific page, for example:
+
+```text
+Read https://example.com and summarize the page.
 ```
 
 ## Endpoints

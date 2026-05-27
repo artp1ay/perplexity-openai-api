@@ -38,6 +38,11 @@ from perplexity_webui_scraper.fetch_models import PerplexityModelsFetcher
 from perplexity_webui_scraper.models import Model
 
 
+URL_PATTERN = re.compile(r"https?://[^\s<>\]\[)('\"`]+", re.IGNORECASE)
+WEB_FETCH_TOOL_KEYWORDS = ("web_fetch", "webfetch", "web_brows", "webbrows", "fetch_url", "fetchurl", "read_url")
+WEB_FETCH_NAME_KEYWORDS = ("web", "fetch", "browse", "browsing", "url", "page")
+
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -401,13 +406,19 @@ class ContentPart(BaseModel):
 
 class ChatMessage(BaseModel):
     role: str
-    content: str | list[dict[str, Any]]
+    content: str | list[dict[str, Any]] | None = None
     name: str | None = None
+    tool_call_id: str | None = None
+    tool_calls: list[dict[str, Any]] | None = None
+    function_call: dict[str, Any] | None = None
 
     model_config = ConfigDict(extra="allow")
 
     def get_text_content(self) -> str:
         """Extract text content, handling both string and array formats."""
+        if self.content is None:
+            return ""
+
         if isinstance(self.content, str):
             return self.content
 
@@ -653,14 +664,165 @@ def messages_to_query(messages: list[ChatMessage]) -> str:
         elif msg.role == "user":
             parts.append(f"User: {msg.get_text_content()}")
         elif msg.role == "assistant":
-            parts.append(f"Assistant: {msg.get_text_content()}")
+            text = msg.get_text_content()
+            if text:
+                parts.append(f"Assistant: {text}")
+            if msg.tool_calls:
+                parts.append(f"[Assistant Tool Calls]\n{json.dumps(msg.tool_calls, ensure_ascii=False)}")
         elif msg.role == "tool":
             # Tool responses are included as context
-            parts.append(f"[Tool Result]\n{msg.get_text_content()}")
+            label = f"Tool Result: {msg.name or msg.tool_call_id}" if (msg.name or msg.tool_call_id) else "Tool Result"
+            parts.append(f"[{label}]\n{msg.get_text_content()}")
         elif msg.role == "function":
             # Function responses (deprecated but still supported)
-            parts.append(f"[Function Result]\n{msg.get_text_content()}")
+            label = f"Function Result: {msg.name}" if msg.name else "Function Result"
+            parts.append(f"[{label}]\n{msg.get_text_content()}")
     return "\n\n".join(parts)
+
+
+def latest_user_text(messages: list[ChatMessage]) -> str:
+    """Return the latest user message text."""
+    for message in reversed(messages):
+        if message.role == "user":
+            return message.get_text_content()
+    return ""
+
+
+def extract_urls(text: str) -> list[str]:
+    """Extract unique HTTP(S) URLs from text."""
+    urls: list[str] = []
+    seen: set[str] = set()
+    for match in URL_PATTERN.finditer(text):
+        url = match.group(0).rstrip(".,;:!?")
+        if url not in seen:
+            seen.add(url)
+            urls.append(url)
+    return urls
+
+
+def has_recent_tool_result(messages: list[ChatMessage]) -> bool:
+    """Detect whether BoltAI has already returned tool output for this turn."""
+    for message in reversed(messages):
+        if message.role == "tool":
+            return True
+        if message.role == "user":
+            return False
+    return False
+
+
+def get_tool_function(tool: dict[str, Any]) -> dict[str, Any]:
+    """Return an OpenAI-compatible function declaration from a tool entry."""
+    if tool.get("type") == "function" and isinstance(tool.get("function"), dict):
+        return tool["function"]
+    if isinstance(tool.get("name"), str):
+        return tool
+    return {}
+
+
+def is_web_fetch_tool(tool: dict[str, Any]) -> bool:
+    """Best-effort detection for BoltAI Web Browsing / Web Fetch tools."""
+    function = get_tool_function(tool)
+    name = str(function.get("name") or tool.get("name") or "").lower()
+    description = str(function.get("description") or tool.get("description") or "").lower()
+    haystack = f"{name} {description}".replace("-", "_")
+
+    if any(keyword in haystack for keyword in WEB_FETCH_TOOL_KEYWORDS):
+        return True
+
+    return (
+        any(keyword in haystack for keyword in WEB_FETCH_NAME_KEYWORDS)
+        and any(keyword in haystack for keyword in ("url", "page", "website", "webpage", "content"))
+    )
+
+
+def selected_tool_name(tool_choice: str | dict[str, Any] | None) -> str | None:
+    """Extract explicitly selected tool name from OpenAI tool_choice."""
+    if not isinstance(tool_choice, dict):
+        return None
+
+    function = tool_choice.get("function")
+    if isinstance(function, dict) and isinstance(function.get("name"), str):
+        return function["name"]
+    if isinstance(tool_choice.get("name"), str):
+        return tool_choice["name"]
+    return None
+
+
+def choose_web_fetch_tool(body: ChatRequest) -> dict[str, Any] | None:
+    """Select a web-fetch-like tool from the request."""
+    if not body.tools or body.tool_choice == "none":
+        return None
+
+    explicit_name = selected_tool_name(body.tool_choice)
+    web_tools = [tool for tool in body.tools if is_web_fetch_tool(tool)]
+    if explicit_name:
+        for tool in body.tools:
+            function = get_tool_function(tool)
+            if function.get("name") == explicit_name:
+                return tool if is_web_fetch_tool(tool) else None
+        return None
+
+    return web_tools[0] if web_tools else None
+
+
+def tool_argument_key(function: dict[str, Any]) -> tuple[str, bool]:
+    """Pick the URL argument key expected by the tool schema."""
+    parameters = function.get("parameters")
+    properties = parameters.get("properties", {}) if isinstance(parameters, dict) else {}
+    required = parameters.get("required", []) if isinstance(parameters, dict) else []
+
+    for key in ("url", "urls", "uri", "link", "webpage_url"):
+        if key in properties:
+            prop = properties[key]
+            is_array = isinstance(prop, dict) and prop.get("type") == "array"
+            return key, is_array
+
+    for key in required:
+        if isinstance(key, str):
+            prop = properties.get(key, {})
+            is_array = isinstance(prop, dict) and prop.get("type") == "array"
+            return key, is_array
+
+    return "url", False
+
+
+def build_web_fetch_tool_calls(body: ChatRequest) -> list[dict[str, Any]]:
+    """Build OpenAI-compatible tool_calls for BoltAI Web Browsing."""
+    tool = choose_web_fetch_tool(body)
+    if tool is None or has_recent_tool_result(body.messages):
+        return []
+
+    urls = extract_urls(latest_user_text(body.messages))
+    if not urls:
+        return []
+
+    function = get_tool_function(tool)
+    function_name = str(function.get("name") or "web_fetch")
+    argument_key, accepts_array = tool_argument_key(function)
+
+    if accepts_array:
+        return [
+            {
+                "id": f"call_{uuid.uuid4().hex[:24]}",
+                "type": "function",
+                "function": {
+                    "name": function_name,
+                    "arguments": json.dumps({argument_key: urls}, ensure_ascii=False),
+                },
+            }
+        ]
+
+    return [
+        {
+            "id": f"call_{uuid.uuid4().hex[:24]}",
+            "type": "function",
+            "function": {
+                "name": function_name,
+                "arguments": json.dumps({argument_key: url}, ensure_ascii=False),
+            },
+        }
+        for url in urls
+    ]
 
 
 def estimate_tokens(text: str) -> int:
@@ -947,8 +1109,36 @@ async def chat_completions(request: Request, body: ChatRequest):
     query = messages_to_query(body.messages)
     response_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
     created = int(time.time())
+    tool_calls = build_web_fetch_tool_calls(body)
 
     try:
+        if tool_calls:
+            if body.stream:
+                return StreamingResponse(
+                    stream_tool_call_response(response_id, created, body.model, tool_calls),
+                    media_type="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Conversation-ID": conv_id},
+                )
+
+            return ChatResponse(
+                id=response_id,
+                created=created,
+                model=body.model,
+                choices=[
+                    ChatChoice(
+                        index=0,
+                        message=ChatMessage(role="assistant", content=None, tool_calls=tool_calls),
+                        finish_reason="tool_calls",
+                    )
+                ],
+                usage=Usage(
+                    prompt_tokens=estimate_tokens(query),
+                    completion_tokens=0,
+                    total_tokens=estimate_tokens(query),
+                ),
+                system_fingerprint="perplexity_v1",
+            )
+
         if body.stream:
             return StreamingResponse(
                 stream_response(response_id, created, body.model, model_obj, query, session),
@@ -978,6 +1168,36 @@ async def chat_completions(request: Request, body: ChatRequest):
     except Exception as e:
         logging.error(f"Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def stream_tool_call_response(
+    response_id: str,
+    created: int,
+    model_name: str,
+    tool_calls: list[dict[str, Any]],
+) -> AsyncGenerator[str, None]:
+    """Stream OpenAI-compatible tool call chunks."""
+    yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={'role': 'assistant'})], system_fingerprint='perplexity_v1').model_dump_json()}\n\n"
+
+    for index, tool_call in enumerate(tool_calls):
+        function = tool_call["function"]
+        delta = {
+            "tool_calls": [
+                {
+                    "index": index,
+                    "id": tool_call["id"],
+                    "type": "function",
+                    "function": {
+                        "name": function["name"],
+                        "arguments": function["arguments"],
+                    },
+                }
+            ]
+        }
+        yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta=delta)], system_fingerprint='perplexity_v1').model_dump_json()}\n\n"
+
+    yield f"data: {ChatChunk(id=response_id, created=created, model=model_name, choices=[ChunkChoice(index=0, delta={}, finish_reason='tool_calls')], system_fingerprint='perplexity_v1').model_dump_json()}\n\n"
+    yield "data: [DONE]\n\n"
 
 
 async def stream_response(
@@ -1109,12 +1329,43 @@ async def ws_chat(ws: WebSocket):
 
         response_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
         created = int(time.time())
+        tool_calls = build_web_fetch_tool_calls(body)
 
         # Send conversation id so the client can reuse it
         await ws.send_text(json.dumps({"type": "meta", "conversation_id": conv_id, "response_id": response_id}))
 
         try:
-            if body.stream:
+            if tool_calls and body.stream:
+                async for frame in stream_tool_call_response(response_id, created, body.model, tool_calls):
+                    if ws_stream_format == "json" and frame.startswith("data: "):
+                        data = frame[len("data: "):].strip()
+                        if data == "[DONE]":
+                            await ws.send_text(json.dumps({"type": "done"}))
+                        else:
+                            await ws.send_text(data)
+                    else:
+                        await ws.send_text(frame)
+            elif tool_calls:
+                resp = ChatResponse(
+                    id=response_id,
+                    created=created,
+                    model=body.model,
+                    choices=[
+                        ChatChoice(
+                            index=0,
+                            message=ChatMessage(role="assistant", content=None, tool_calls=tool_calls),
+                            finish_reason="tool_calls",
+                        )
+                    ],
+                    usage=Usage(
+                        prompt_tokens=estimate_tokens(messages_to_query(body.messages)),
+                        completion_tokens=0,
+                        total_tokens=estimate_tokens(messages_to_query(body.messages)),
+                    ),
+                    system_fingerprint="perplexity_v1",
+                )
+                await ws.send_text(resp.model_dump_json())
+            elif body.stream:
                 async for frame in stream_response(
                     response_id,
                     created,
